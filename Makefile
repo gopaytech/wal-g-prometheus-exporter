@@ -1,3 +1,5 @@
+.PHONY: clean
+
 clean:
 	rm -fr build/ dist/ __pycache__
 
