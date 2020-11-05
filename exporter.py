@@ -285,9 +285,9 @@ if __name__ == '__main__':
                     result = c.fetchone()
                     if bool(result) and result[0]:
                         break
-                    else:
-                        info("Running on slave, waiting for promotion...")
-                        time.sleep(60)
+                    #  else:
+                        #  info("Running on slave, waiting for promotion...")
+                        #  time.sleep(60)
         except Exception:
             error("Unable to connect postgres server, retrying in 60sec...")
             time.sleep(60)
