@@ -262,7 +262,11 @@ if __name__ == '__main__':
 
     # Start up the server to expose the metrics.
     start_http_server(http_port)
+    # Test debug
     info("Webserver started on port %s", http_port)
+    info("PGHOST %s", os.getenv('PGHOST', 'localhost'))
+    info("PGUSER %s", os.getenv('PGUSER', 'postgres'))
+    info("PGDATABASE %s", os.getenv('PGDATABASE', 'postgres'))
 
     # Check if this is a master instance
     while True:
