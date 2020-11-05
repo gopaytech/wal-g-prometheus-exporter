@@ -281,10 +281,12 @@ if __name__ == '__main__':
             ) as db_connection:
                 db_connection.autocommit = True
                 with db_connection.cursor() as c:
-                    c.execute("SELECT NOT pg_is_in_recovery()")
+                    c.execute("SELECT pg_is_in_recovery();")
                     result = c.fetchone()
-                    if bool(result) and result[0]:
-                        break
+                    info("Is in recovery mode: %s", result[0])
+                    break
+                    #  if bool(result) and result[0]:
+                        #  break
                     #  else:
                         #  info("Running on slave, waiting for promotion...")
                         #  time.sleep(60)

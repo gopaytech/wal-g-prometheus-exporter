@@ -5,6 +5,7 @@
 ### Non-container installation
 
 1. Run `make build-binary` and it will create an executable binary file `wal-g-prometheus-exporter`.
+2. Execute the file `./wal-g-prometheus-exporter`.
 
 ### Container installation
 
