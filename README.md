@@ -2,7 +2,7 @@
 
 ## Requirements
 
-This scripts is depend on Python 3.7+
+1. Python 3.7+ (For `make build-binary`).
 
 ## Build
 
