@@ -1,13 +1,23 @@
 # wal-g-prometheus-exporter
 
+## Requirements
+
+This scripts is depend on Python 3.7+
+
+## Build
+
+1. For Linux, you can build with `make build` and use the binary output.
+2. For specific OS or to run in your own machine, you can get the binary with `make build-binary` and use the binary output.
+
 ## Usage
 
-### Non-container installation
+```
+usage: wal-g-prometheus-exporter [-h] [--debug] archive_dir
 
-1. Run `make build-binary` and it will create an executable binary file `wal-g-prometheus-exporter`.
-2. Execute the file `./wal-g-prometheus-exporter`.
+positional arguments:
+  archive_dir  pg_wal/archive_status/ Directory location
 
-### Container installation
-
-1. You can try to execute the `docker-compose.yml` file.
-
+optional arguments:
+  -h, --help   show this help message and exit
+  --debug      enable debug log
+```
