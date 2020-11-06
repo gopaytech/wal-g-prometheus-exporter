@@ -232,7 +232,10 @@ class Exporter():
 
     def last_xlog_upload_callback(self):
         archive_status = self.last_archive_status()
-        return archive_status['last_archived_time'].timestamp()
+        if archive_status['last_archived_time'] is None:
+            raise Exception("There is no WAL archiver process running on this postgresql\nCheck with SELECT * FROM pg_stat_archiver;")
+        else:
+            return archive_status['last_archived_time'].timestamp()
 
     def xlog_ready_callback(self):
         res = 0
