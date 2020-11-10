@@ -5,6 +5,7 @@
 1. Python 3.7+ (For `make build-binary`).
 2. This exporter must run on Postgres instance that do the WAL archiving or you can check with `SELECT * FROM pg_stat_archiver;`.
 If there is no output from the query, then this exporter won't run and give an error message `There is no WAL archiver process running on this postgresql\nCheck with SELECT * FROM pg_stat_archiver;`
+3. WAL-G must be installed.
 
 ## Build
 
