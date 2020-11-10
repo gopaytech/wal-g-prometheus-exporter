@@ -18,9 +18,11 @@ from psycopg2.extras import DictCursor
 # -------------
 
 parser = argparse.ArgumentParser()
+parser.version = "0.7.0"
 parser.add_argument("archive_dir",
                     help="pg_wal/archive_status/ Directory location")
 parser.add_argument("--debug", help="enable debug log", action="store_true")
+parser.add_argument("--version", help="show binary version", action="version")
 args = parser.parse_args()
 if args.debug:
     logging.basicConfig(level=logging.DEBUG)
