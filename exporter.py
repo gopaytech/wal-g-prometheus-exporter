@@ -18,7 +18,7 @@ from psycopg2.extras import DictCursor
 # -------------
 
 parser = argparse.ArgumentParser()
-parser.version = "0.7.0"
+parser.version = "0.0.8"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--debug", help="enable debug log", action="store_true")
@@ -272,6 +272,7 @@ if __name__ == '__main__':
     info("PGHOST %s", os.getenv('PGHOST', 'localhost'))
     info("PGUSER %s", os.getenv('PGUSER', 'postgres'))
     info("PGDATABASE %s", os.getenv('PGDATABASE', 'postgres'))
+    info("WALG_GS_PREFIX %s", os.getenv('WALG_GS_PREFIX', ''))
 
     # Check if this is a master instance
     while True:
