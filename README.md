@@ -15,12 +15,12 @@ If there is no output from the query, then this exporter won't run and give an e
 ## Usage
 
 ```
-usage: wal-g-prometheus-exporter [-h] [--debug] archive_dir
-
-positional arguments:
-  archive_dir  pg_wal/archive_status/ Directory location
+usage: wal-g-exporter [-h] --archive_dir ARCHIVE_DIR [--debug] [--version]
 
 optional arguments:
-  -h, --help   show this help message and exit
-  --debug      enable debug log
+  -h, --help            show this help message and exit
+  --archive_dir ARCHIVE_DIR
+                        pg_wal/archive_status/ Directory location
+  --debug               enable debug log
+  --version             show binary version
 ```
