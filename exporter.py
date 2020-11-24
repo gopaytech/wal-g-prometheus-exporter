@@ -18,7 +18,7 @@ from psycopg2.extras import DictCursor
 # -------------
 
 parser = argparse.ArgumentParser()
-parser.version = "0.0.8"
+parser.version = "0.0.9"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--debug", help="enable debug log", action="store_true")
@@ -99,7 +99,6 @@ def wal_diff(a, b):
     b_int = int(b[8:16], 16) * 0x100 + int(b[16:24], 16)
     return a_int - b_int
 
-
 class Exporter():
 
     def __init__(self):
@@ -171,7 +170,12 @@ class Exporter():
             res = subprocess.run(["wal-g", "backup-list",
                                   "--detail", "--json"],
                                  capture_output=True, check=True)
-            new_bbs = list(map(format_date, json.loads(res.stdout)))
+
+            if res.stdout.decode("utf-8") is "":
+                new_bbs = []
+            else:
+                new_bbs = list(map(format_date, json.loads(res.stdout)))
+                
             new_bbs.sort(key=lambda bb: bb['time'])
             new_bbs_name = [bb['backup_name'] for bb in new_bbs]
             old_bbs_name = [bb['backup_name'] for bb in self.bbs]
@@ -190,12 +194,16 @@ class Exporter():
                     (self.basebackup.labels(bb['wal_file_name'],
                                             bb['start_lsn'])
                      .set(bb['time'].timestamp()))
-            # Update backup list
-            self.bbs = new_bbs
-            info("%s basebackups found (last: %s), %s deleted",
-                 len(self.bbs),
-                 self.bbs[len(self.bbs) - 1]['time'],
-                 bb_deleted)
+
+            if len(new_bbs) == 0:
+                info("No basebackups found")
+            else:
+                # Update backup list
+                self.bbs = new_bbs
+                info("%s basebackups found (last: %s), %s deleted",
+                     len(self.bbs),
+                     self.bbs[len(self.bbs) - 1]['time'],
+                     bb_deleted)
 
             self.basebackup_exception = False
         except subprocess.CalledProcessError as e:
