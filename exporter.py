@@ -18,7 +18,7 @@ from psycopg2.extras import DictCursor
 # -------------
 
 parser = argparse.ArgumentParser()
-parser.version = "0.0.9"
+parser.version = "0.1.0"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--debug", help="enable debug log", action="store_true")
@@ -171,11 +171,12 @@ class Exporter():
                                   "--detail", "--json"],
                                  capture_output=True, check=True)
 
+            # Check if backup-list return an empty result
             if res.stdout.decode("utf-8") is "":
                 new_bbs = []
             else:
                 new_bbs = list(map(format_date, json.loads(res.stdout)))
-                
+
             new_bbs.sort(key=lambda bb: bb['time'])
             new_bbs_name = [bb['backup_name'] for bb in new_bbs]
             old_bbs_name = [bb['backup_name'] for bb in self.bbs]
@@ -297,13 +298,8 @@ if __name__ == '__main__':
                 with db_connection.cursor() as c:
                     c.execute("SELECT pg_is_in_recovery();")
                     result = c.fetchone()
-                    info("Is in recovery mode: %s", result[0])
+                    info("Is in recovery mode? %s", result[0])
                     break
-                    #  if bool(result) and result[0]:
-                        #  break
-                    #  else:
-                        #  info("Running on slave, waiting for promotion...")
-                        #  time.sleep(60)
         except Exception:
             error("Unable to connect postgres server, retrying in 60sec...")
             time.sleep(60)
@@ -315,4 +311,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGHUP, exporter.update_basebackup)
 
     while True:
-        time.sleep(1)
+        # Periodically update backup-list
+        exporter.update_basebackup()
+        time.sleep(30)
