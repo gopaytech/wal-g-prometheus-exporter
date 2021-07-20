@@ -15,12 +15,13 @@ If there is no output from the query, then this exporter won't run and give an e
 ## Usage
 
 ```
-usage: wal-g-exporter [-h] --archive_dir ARCHIVE_DIR [--debug] [--version]
+usage: wal-g-exporter [-h] --archive_dir ARCHIVE_DIR [--debug] [--config] CONFIG_FILE_PATH [--version]
 
 optional arguments:
   -h, --help            show this help message and exit
   --archive_dir ARCHIVE_DIR
                         pg_wal/archive_status/ Directory location
+  --config              file path for wal-g config
   --debug               enable debug log
   --version             show binary version
 ```
