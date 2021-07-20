@@ -21,7 +21,8 @@ optional arguments:
   -h, --help            show this help message and exit
   --archive_dir ARCHIVE_DIR
                         pg_wal/archive_status/ Directory location
-  --config              file path for wal-g config
+  --config CONFIG_FILE_PATH
+                        file path for wal-g config
   --debug               enable debug log
   --version             show binary version
 ```

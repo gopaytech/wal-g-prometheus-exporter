@@ -21,9 +21,9 @@ parser = argparse.ArgumentParser()
 parser.version = "0.1.0"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
+parser.add_argument("--config", help="walg config file path", action="store")
 parser.add_argument("--debug", help="enable debug log", action="store_true")
 parser.add_argument("--version", help="show binary version", action="version")
-parser.add_argument("--config", help="walg config file path", action="store")
 
 args = parser.parse_args()
 if args.debug:
