@@ -21,8 +21,10 @@ parser = argparse.ArgumentParser()
 parser.version = "0.1.0"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
+parser.add_argument("--config", help="walg config file path", action="store")
 parser.add_argument("--debug", help="enable debug log", action="store_true")
 parser.add_argument("--version", help="show binary version", action="version")
+
 args = parser.parse_args()
 if args.debug:
     logging.basicConfig(level=logging.DEBUG)
@@ -167,8 +169,12 @@ class Exporter():
         info('Updating basebackups metrics...')
         try:
             # Fetch remote backup list
-            res = subprocess.run(["wal-g", "backup-list",
-                                  "--detail", "--json"],
+            command = ["wal-g", "backup-list",
+                                  "--detail", "--json"]
+            if args.config:
+                command.extend(["--config", args.config])
+
+            res = subprocess.run(command,
                                  capture_output=True, check=True)
 
             # Check if backup-list return an empty result
