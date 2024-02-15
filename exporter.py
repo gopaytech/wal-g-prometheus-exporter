@@ -361,6 +361,10 @@ if __name__ == '__main__':
 
     # Check if this is a master instance
     while True:
+        if terminate:
+                info('Received SIGTERM, shutting down')
+                break
+
         try:
             with psycopg2.connect(
                 host = dbhost,
@@ -387,6 +391,10 @@ if __name__ == '__main__':
     first_start = True
 
     while True:
+        if terminate:
+                info('Received SIGTERM, shutting down')
+                break
+
         try:
             flag_enable = os.path.isfile('/var/lib/postgresql/walg_exporter.enable')
 
@@ -403,7 +411,7 @@ if __name__ == '__main__':
                 time.sleep(walg_exporter_scrape_interval)
             else:
                 info('WAL-G exporter is disabled. Waiting to be enabled.')
-                time.sleep(walg_exporter_scrape_interval)
+                break
         except Exception as e:
             if terminate:
                 info('Received SIGTERM during exception, shutting down')
