@@ -272,6 +272,7 @@ class Exporter():
                 self.bbs = new_bbs
                 info("%s basebackups found (first: %s, last: %s), %s deleted",
                      len(self.bbs),
+                     self.bbs[0]['start_time'],
                      self.bbs[len(self.bbs) - 1]['start_time'],
                      bb_deleted)
 
