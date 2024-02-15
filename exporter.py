@@ -20,7 +20,7 @@ from pathlib import Path
 # -------------
 
 parser = argparse.ArgumentParser()
-parser.version = "0.1.0"
+parser.version = "0.2.0"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--config", help="walg config file path", action="store")
@@ -41,6 +41,7 @@ for key in logging.Logger.manager.loggerDict:
 archive_dir = args.archive_dir
 http_port = 9351
 READY_WAL_RE = re.compile(r"^[A-F0-9]{24}\.ready$")
+terminate = False
 
 # Base backup update
 # ------------------
@@ -81,6 +82,11 @@ def convert_size(size_bytes):
     p = math.pow(1024, i)
     s = round(size_bytes / p, 2)
     return "%s %s" % (s, size_name[i])
+
+def signal_handler(sig, frame):
+    global terminate
+    info('SIGTERM received, preparing to shutdown')
+    terminate = True
 
 class Exporter():
     def __init__(self):
@@ -209,12 +215,9 @@ class Exporter():
             self.wal_archive_count.set(0)
 
     def update_basebackup(self, *unused):
-        """
-            When this script receive a SIGHUP signal, it will call backup-list
-            and update metrics about basebackups
-        """
 
         info('Updating basebackups metrics...')
+
         try:
             # Fetch remote backup list
             command = ["wal-g", "backup-list",
@@ -336,6 +339,9 @@ if __name__ == '__main__':
     info("Startup...")
     info('My PID is: %s', os.getpid())
 
+    # Registering the signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, signal_handler)
+
     info('Load configuration in /etc/default/walg.env')
     dotenv_path = Path('/etc/default/walg.env')
     load_dotenv(dotenv_path=dotenv_path)
@@ -370,17 +376,38 @@ if __name__ == '__main__':
                     info("Is in recovery mode? %s", result[0])
                     break
         except Exception:
+            if terminate:
+                info('Received SIGTERM during exception, shutting down')
+                break
+
             error("Unable to connect postgres server, retrying in 60sec...")
-            time.sleep(60)
+            time.sleep(walg_exporter_scrape_interval)
 
-    # Launch exporter
-    exporter = Exporter()
 
-    # listen to SIGHUP signal
-    signal.signal(signal.SIGHUP, exporter.update_basebackup)
+    first_start = True
 
     while True:
-        # Periodically update backup-list
-        exporter.update_basebackup()
-        exporter.update_wal_status()
-        time.sleep(walg_exporter_scrape_interval)
+        try:
+            flag_enable = os.path.isfile('/var/lib/postgresql/walg_exporter.enable')
+
+            if flag_enable:
+                if first_start:
+                    # Launch exporter 
+                    # then set first_start to False so it won't re-initialize Exporter()
+                    exporter = Exporter()
+                    first_start = False
+
+                exporter.update_basebackup()
+                exporter.update_wal_status()
+
+                time.sleep(walg_exporter_scrape_interval)
+            else:
+                info('WAL-G exporter is disabled. Waiting to be enabled.')
+                time.sleep(walg_exporter_scrape_interval)
+        except Exception as e:
+            if terminate:
+                info('Received SIGTERM during exception, shutting down')
+                break
+
+            error('Error occured, retrying in %s seconds' + walg_exporter_scrape_interval + str(e))
+            time.sleep(walg_exporter_scrape_interval)

@@ -32,27 +32,27 @@ optional arguments:
 ```
 # HELP walg_basebackup Remote Basebackups
 # TYPE walg_basebackup gauge
-walg_basebackup{start_lsn="154100834568",start_wal_segment="0000000800000023000000E1"} 1.707896489927616e+09
+walg_basebackup{compressed_size="31.15 GB",finish_lsn="154846241808",finish_time="2024-02-14 08:11:02.501703+00:00",is_permanent="False",start_lsn="154464435792",start_time="2024-02-14 08:01:01.469195+00:00",start_wal_segment="0000000800000023000000F6",uncompressed_size="59.95 GB"} 1.707897661469195e+09
 # HELP walg_basebackup_count Remote Basebackups count
 # TYPE walg_basebackup_count gauge
-walg_basebackup_count 4.0
+walg_basebackup_count 3.0
 # HELP walg_last_upload Last upload of incremental or full backup
 # TYPE walg_last_upload gauge
-walg_last_upload{type="xlog"} 1.707984782346683e+09
+walg_last_upload{type="xlog"} 1.707988922995336e+09
 walg_last_upload{type="basebackup"} 1.707980547275256e+09
-walg_last_upload{type="wal"} 1.707984782346683e+09
+walg_last_upload{type="wal"} 1.707988922995336e+09
 # HELP walg_oldest_basebackup Oldest full backup
 # TYPE walg_oldest_basebackup gauge
-walg_oldest_basebackup 1.707896489927616e+09
+walg_oldest_basebackup 1.707897661469195e+09
 # HELP walg_missing_remote_wal_segment_at_end Xlog ready for upload
 # TYPE walg_missing_remote_wal_segment_at_end gauge
 walg_missing_remote_wal_segment_at_end 0.0
-# HELP walg_exception Wal-g exception: 2 for basebackup error, 3 for xlog error and 5 for remote error
+# HELP walg_exception Wal-g exception: 1 for basebackup error, 2 for xlog error and 3 for both errors
 # TYPE walg_exception gauge
 walg_exception 0.0
 # HELP walg_xlogs_since_basebackup Xlog uploaded since last base backup
 # TYPE walg_xlogs_since_basebackup gauge
-walg_xlogs_since_basebackup 84.0
+walg_xlogs_since_basebackup 159.0
 # HELP walg_last_backup_duration Duration of the last full backup
 # TYPE walg_last_backup_duration gauge
 walg_last_backup_duration 675.399887
@@ -62,7 +62,7 @@ walg_wal_integrity_status{status="OK"} 1.0
 walg_wal_integrity_status{status="FAILURE"} 0.0
 # HELP walg_wal_archive_count Total WAL archived count from oldest to latest full backup
 # TYPE walg_wal_archive_count gauge
-walg_wal_archive_count 2663.0
+walg_wal_archive_count 2717.0
 # HELP walg_wal_archive_missing_count Total missing WAL count
 # TYPE walg_wal_archive_missing_count gauge
 walg_wal_archive_missing_count 0.0
