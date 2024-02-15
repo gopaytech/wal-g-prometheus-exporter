@@ -158,9 +158,70 @@ class Exporter():
         )
 
         self.wal_integrity_status = Gauge('walg_wal_integrity_status', 'Overall WAL archive integrity status', ['status'])
+        self.wal_archive_count = Gauge('walg_wal_archive_count', 'Total WAL archived count from oldest to latest full backup')
+        self.wal_archive_missing_count = Gauge('walg_wal_archive_missing_count', 'Total missing WAL count')
 
         # Fetch remote base backups
         self.update_basebackup()
+
+    def update_wal_status(self):
+        try:
+            command = ["wal-g", 'wal-verify', 'integrity', '--json']
+            if args.config:
+                command.extend(["--config", args.config])
+
+            res = subprocess.run(command,
+                                 capture_output=True, check=True)
+
+        except subprocess.CalledProcessError as e:
+            error(e)
+
+        # Check json output of wal-g for the integrity status
+        if res.stdout.decode("utf-8") == "":
+            wal_archive_list = []
+            wal_archive_integrity_status = []
+        else:
+            wal_archive_list = list(json.loads(res.stdout)["integrity"]["details"])
+            wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
+            wal_archive_integrity_status = json.loads(res.stdout)["integrity"]["status"]
+
+        wal_archive_count = 0
+        wal_archive_missing_count = 0
+
+        if (len(wal_archive_list) > 0):
+            # Update WAL archive list and export metrics
+            # Count found and missing WAL archives
+            for timelines in wal_archive_list:
+                if timelines['status'] == 'FOUND':
+                    wal_archive_count = wal_archive_count + timelines['segments_count']
+                else:
+                    wal_archive_missing_count = wal_archive_missing_count + timelines['segments_count']
+
+            # Get archive status from database
+            archive_status = self.get_archive_status()
+
+            # Log WAL informations
+            info("WAL integrity status is: %s", wal_archive_integrity_status)
+            info("Found %s WAL archives in %s timelines, %s WAL archives missing",
+                         wal_archive_count, len(wal_archive_list), wal_archive_missing_count)
+
+            # Update all WAL related metrics
+            # Check for the integrity status and set the metrics accordingly
+            if wal_archive_integrity_status == 'OK':
+                self.wal_integrity_status.labels('OK').set(1)
+                self.wal_integrity_status.labels('FAILURE').set(0)
+            else:
+                self.wal_integrity_status.labels('OK').set(0)
+                self.wal_integrity_status.labels('FAILURE').set(1)
+            
+            self.wal_archive_count.set(wal_archive_count)
+            self.wal_archive_missing_count.set(wal_archive_missing_count)
+            self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
+
+            logging.info('Finished updating WAL archive metrics...')
+        else:
+            logging.info("No WAL archives found")
+            self.wal_archive_count.set(0)
 
     def update_basebackup(self, *unused):
         """
@@ -327,4 +388,5 @@ if __name__ == '__main__':
     while True:
         # Periodically update backup-list
         exporter.update_basebackup()
+        exporter.update_wal_status()
         time.sleep(walg_exporter_scrape_interval)
