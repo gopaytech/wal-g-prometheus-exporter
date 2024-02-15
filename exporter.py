@@ -327,4 +327,4 @@ if __name__ == '__main__':
     while True:
         # Periodically update backup-list
         exporter.update_basebackup()
-        time.sleep(30)
+        time.sleep(walg_exporter_scrape_interval)
