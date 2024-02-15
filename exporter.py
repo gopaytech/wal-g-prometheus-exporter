@@ -98,7 +98,7 @@ class Exporter():
                                     'finish_lsn',
                                     'is_permanent',
                                     'uncompressed_size',
-                                    'compressed_size'
+                                    'compressed_size',
                                     'start_time',
                                     'finish_time'
                                 ])
