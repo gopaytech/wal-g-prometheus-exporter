@@ -356,6 +356,9 @@ if __name__ == '__main__':
     dbname = os.getenv('PGDATABASE', 'postgres')
     walg_exporter_scrape_interval = os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60)
 
+    info(dbhost)
+    info(os.getenv('WALG_DELTA_MAX_STEPS'))
+
     # Start up the server to expose the metrics.
     start_http_server(http_port)
 
