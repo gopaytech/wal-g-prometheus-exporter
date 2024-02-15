@@ -62,33 +62,6 @@ def parse_date(date, fmt):
         fmt = fmt.replace('.%f', '')
         return datetime.datetime.strptime(date, fmt)
 
-
-def get_previous_wal(wal):
-    timeline = wal[0:8]
-    segment_low = int(wal[16:24], 16) - 1
-    segment_high = int(wal[8:16], 16) + (segment_low // 0x100)
-    segment_low = segment_low % 0x100
-    return '%s%08X%08X' % (timeline, segment_high, segment_low)
-
-
-def get_next_wal(wal):
-    timeline = wal[0:8]
-    segment_low = int(wal[16:24], 16) + 1
-    segment_high = int(wal[8:16], 16) + (segment_low // 0x100)
-    segment_low = segment_low % 0x100
-    return '%s%08X%08X' % (timeline, segment_high, segment_low)
-
-
-def is_before(a, b):
-    timeline_a = a[0:8]
-    timeline_b = b[0:8]
-    if timeline_a != timeline_b:
-        return False
-    a_int = int(a[8:16], 16) * 0x100 + int(a[16:24], 16)
-    b_int = int(b[8:16], 16) * 0x100 + int(b[16:24], 16)
-    return a_int < b_int
-
-
 def wal_diff(a, b):
     timeline_a = a[0:8]
     timeline_b = b[0:8]
