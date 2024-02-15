@@ -249,6 +249,7 @@ class Exporter():
                     (self.basebackup.labels(bb['wal_file_name'],
                                             bb['start_lsn'],
                                             bb['finish_lsn'],
+                                            bb['is_permanent'],
                                             convert_size(bb['uncompressed_size']),
                                             convert_size(bb['compressed_size']),
                                             bb['start_time'],
