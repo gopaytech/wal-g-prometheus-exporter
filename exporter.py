@@ -161,9 +161,6 @@ class Exporter():
         self.wal_archive_count = Gauge('walg_wal_archive_count', 'Total WAL archived count from oldest to latest full backup')
         self.wal_archive_missing_count = Gauge('walg_wal_archive_missing_count', 'Total missing WAL count')
 
-        # Fetch remote base backups
-        self.update_basebackup()
-
     def update_wal_status(self):
         try:
             command = ["wal-g", 'wal-verify', 'integrity', '--json']
