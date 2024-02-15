@@ -39,11 +39,7 @@ for key in logging.Logger.manager.loggerDict:
 
 archive_dir = args.archive_dir
 http_port = 9351
-DONE_WAL_RE = re.compile(r"^[A-F0-9]{24}\.done$")
 READY_WAL_RE = re.compile(r"^[A-F0-9]{24}\.ready$")
-
-# TODO:
-# * walg_last_basebackup_duration
 
 # Base backup update
 # ------------------
@@ -357,6 +353,7 @@ if __name__ == '__main__':
     # Start up the server to expose the metrics.
     info('Starting up the server')
     start_http_server(http_port)
+    info('Server running in port: %s', http_port)
 
     # Check if this is a master instance
     while True:
