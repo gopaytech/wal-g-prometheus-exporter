@@ -7,6 +7,7 @@ import re
 import argparse
 import logging
 import time
+import math
 from logging import warning, info, debug, error  # noqa: F401
 from prometheus_client import start_http_server
 from prometheus_client import Gauge
@@ -71,6 +72,16 @@ def wal_diff(a, b):
     b_int = int(b[8:16], 16) * 0x100 + int(b[16:24], 16)
     return a_int - b_int
 
+def convert_size(size_bytes):
+    if size_bytes == 0:
+       return "0B"
+
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return "%s %s" % (s, size_name[i])
+
 class Exporter():
     def __init__(self):
         self.basebackup_exception = False
@@ -80,9 +91,17 @@ class Exporter():
         self.archive_status = None
 
         # Declare metrics
-        self.basebackup = Gauge('walg_basebackup',
-                                'Remote Basebackups',
-                                ['start_wal_segment', 'start_lsn'])
+        self.basebackup = Gauge('walg_basebackup', 'Remote Basebackups',
+                                [
+                                    'start_wal_segment',
+                                    'start_lsn',
+                                    'finish_lsn',
+                                    'is_permanent',
+                                    'uncompressed_size',
+                                    'compressed_size'
+                                    'start_time',
+                                    'finish_time'
+                                ])
         self.basebackup_count = Gauge('walg_basebackup_count',
                                       'Remote Basebackups count')
         self.basebackup_count.set_function(lambda: len(self.bbs))
@@ -228,7 +247,12 @@ class Exporter():
             for bb in new_bbs:
                 if bb['backup_name'] not in old_bbs_name:
                     (self.basebackup.labels(bb['wal_file_name'],
-                                            bb['start_lsn'])
+                                            bb['start_lsn'],
+                                            bb['finish_lsn'],
+                                            convert_size(bb['uncompressed_size']),
+                                            convert_size(bb['compressed_size']),
+                                            bb['start_time'],
+                                            bb['finish_time'])
                      .set(bb['start_time'].timestamp()))
 
             if len(new_bbs) == 0:
