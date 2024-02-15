@@ -12,7 +12,8 @@ from prometheus_client import start_http_server
 from prometheus_client import Gauge
 import psycopg2
 from psycopg2.extras import DictCursor
-
+from dotenv import load_dotenv
+from pathlib import Path
 
 # Configuration
 # -------------
@@ -102,7 +103,6 @@ def wal_diff(a, b):
     return a_int - b_int
 
 class Exporter():
-
     def __init__(self):
         self.basebackup_exception = False
         self.xlog_exception = False
@@ -156,6 +156,8 @@ class Exporter():
                       self.bbs[len(self.bbs) - 1]['start_time']).total_seconds()
                      if self.bbs else 0)
         )
+
+        self.wal_integrity_status = Gauge('walg_wal_integrity_status', 'Overall WAL archive integrity status', ['status'])
 
         # Fetch remote base backups
         self.update_basebackup()
@@ -281,25 +283,30 @@ if __name__ == '__main__':
     info("Startup...")
     info('My PID is: %s', os.getpid())
 
+    info('Load configuration in /etc/default/walg.env')
+    dotenv_path = Path('/etc/default/walg.env')
+    load_dotenv(dotenv_path=dotenv_path)
+
+    info('Reading configuration')
+    dbhost = os.getenv('PGHOST', 'localhost')
+    dbport = os.getenv('PGPORT', '5432')
+    dbuser = os.getenv('PGUSER', 'postgres')
+    dbpassword = os.getenv('PGPASSWORD')
+    dbname = os.getenv('PGDATABASE', 'postgres')
+    walg_exporter_scrape_interval = os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60)
+
     # Start up the server to expose the metrics.
     start_http_server(http_port)
-    # Test debug
-    info("Webserver started on port %s", http_port)
-    info("PGHOST %s", os.getenv('PGHOST', 'localhost'))
-    info("PGUSER %s", os.getenv('PGUSER', 'postgres'))
-    info("PGDATABASE %s", os.getenv('PGDATABASE', 'postgres'))
-    info("WALG_GS_PREFIX %s", os.getenv('WALG_GS_PREFIX', ''))
 
     # Check if this is a master instance
     while True:
         try:
             with psycopg2.connect(
-                host=os.getenv('PGHOST', 'localhost'),
-                port=os.getenv('PGPORT', '5432'),
-                user=os.getenv('PGUSER', 'postgres'),
-                password=os.getenv('PGPASSWORD'),
-                dbname=os.getenv('PGDATABASE', 'postgres'),
-
+                host = dbhost,
+                port = dbport,
+                user = dbuser,
+                password = dbpassword,
+                dbname = dbname,
             ) as db_connection:
                 db_connection.autocommit = True
                 with db_connection.cursor() as c:
