@@ -134,9 +134,9 @@ class Exporter():
         self.xlog_ready.set_function(self.xlog_ready_callback)
 
         self.exception = Gauge('walg_exception',
-                               'Wal-g exception: 2 for basebackup error, '
-                               '3 for xlog error and '
-                               '5 for remote error')
+                               'Wal-g exception: 1 for basebackup error, '
+                               '2 for xlog error and '
+                               '3 for both errors')
         self.exception.set_function(
             lambda: (1 if self.basebackup_exception else 0 +
                      2 if self.xlog_exception else 0))

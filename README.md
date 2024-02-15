@@ -26,3 +26,44 @@ optional arguments:
   --debug               enable debug log
   --version             show binary version
 ```
+
+## Exposed Metrics
+
+```
+# HELP walg_basebackup Remote Basebackups
+# TYPE walg_basebackup gauge
+walg_basebackup{start_lsn="154100834568",start_wal_segment="0000000800000023000000E1"} 1.707896489927616e+09
+# HELP walg_basebackup_count Remote Basebackups count
+# TYPE walg_basebackup_count gauge
+walg_basebackup_count 4.0
+# HELP walg_last_upload Last upload of incremental or full backup
+# TYPE walg_last_upload gauge
+walg_last_upload{type="xlog"} 1.707984782346683e+09
+walg_last_upload{type="basebackup"} 1.707980547275256e+09
+walg_last_upload{type="wal"} 1.707984782346683e+09
+# HELP walg_oldest_basebackup Oldest full backup
+# TYPE walg_oldest_basebackup gauge
+walg_oldest_basebackup 1.707896489927616e+09
+# HELP walg_missing_remote_wal_segment_at_end Xlog ready for upload
+# TYPE walg_missing_remote_wal_segment_at_end gauge
+walg_missing_remote_wal_segment_at_end 0.0
+# HELP walg_exception Wal-g exception: 2 for basebackup error, 3 for xlog error and 5 for remote error
+# TYPE walg_exception gauge
+walg_exception 0.0
+# HELP walg_xlogs_since_basebackup Xlog uploaded since last base backup
+# TYPE walg_xlogs_since_basebackup gauge
+walg_xlogs_since_basebackup 84.0
+# HELP walg_last_backup_duration Duration of the last full backup
+# TYPE walg_last_backup_duration gauge
+walg_last_backup_duration 675.399887
+# HELP walg_wal_integrity_status Overall WAL archive integrity status
+# TYPE walg_wal_integrity_status gauge
+walg_wal_integrity_status{status="OK"} 1.0
+walg_wal_integrity_status{status="FAILURE"} 0.0
+# HELP walg_wal_archive_count Total WAL archived count from oldest to latest full backup
+# TYPE walg_wal_archive_count gauge
+walg_wal_archive_count 2663.0
+# HELP walg_wal_archive_missing_count Total missing WAL count
+# TYPE walg_wal_archive_missing_count gauge
+walg_wal_archive_missing_count 0.0
+```
