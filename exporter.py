@@ -198,7 +198,7 @@ class Exporter():
                     wal_archive_missing_count = wal_archive_missing_count + timelines['segments_count']
 
             # Get archive status from database
-            archive_status = self.get_archive_status()
+            archive_status = self._last_archive_status()
 
             # Log WAL informations
             info("WAL integrity status is: %s", wal_archive_integrity_status)
