@@ -352,7 +352,7 @@ if __name__ == '__main__':
     dbuser = os.getenv('PGUSER', 'postgres')
     dbpassword = os.getenv('PGPASSWORD')
     dbname = os.getenv('PGDATABASE', 'postgres')
-    walg_exporter_scrape_interval = os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60)
+    walg_exporter_scrape_interval = int(os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60))
 
     # Start up the server to expose the metrics.
     info('Starting up the server')
@@ -417,5 +417,6 @@ if __name__ == '__main__':
                 info('Received SIGTERM during exception, shutting down')
                 break
 
-            error('Error occured, retrying in %i seconds. Err: %s', walg_exporter_scrape_interval, str(e))
+            error('Error occured, retrying in %i seconds.', walg_exporter_scrape_interval)
+            error(e)
             time.sleep(walg_exporter_scrape_interval)
