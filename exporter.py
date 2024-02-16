@@ -411,6 +411,7 @@ if __name__ == '__main__':
                 time.sleep(walg_exporter_scrape_interval)
             else:
                 info('WAL-G exporter is disabled. Waiting to be enabled.')
+                time.sleep(walg_exporter_scrape_interval)
                 break
         except Exception as e:
             if terminate:
