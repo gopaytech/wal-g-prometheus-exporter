@@ -1,11 +1,14 @@
 # wal-g-prometheus-exporter
 
+Exporter for WAL-G that runs in PostgreSQL instances.
+
 ## Requirements
 
 1. Python 3.7+ (For `make build-binary`).
-2. This exporter must run on Postgres instance that do the WAL archiving or you can check with `SELECT * FROM pg_stat_archiver;`.
-If there is no output from the query, then this exporter won't run and give an error message `There is no WAL archiver process running on this postgresql\nCheck with SELECT * FROM pg_stat_archiver;`
-3. WAL-G must be installed.
+2. WAL-G binary must be installed.
+3. This exporter require a flag file called `/var/lib/postgresql/walg_exporter.enable`
+  The exporter will keep trying every `WALG_EXPORTER_SCRAPE_INTERVAL` seconds to see if the flag exists or not. 
+  This flag file feature can be used in case when there is a failover event happens, for example if the exporter supposed to be run only in master node.
 
 ## Build
 
@@ -15,7 +18,7 @@ If there is no output from the query, then this exporter won't run and give an e
 ## Usage
 
 ```
-usage: wal-g-exporter [-h] --archive_dir ARCHIVE_DIR [--debug] [--config] CONFIG_FILE_PATH [--version]
+usage: wal-g-exporter [-h] --archive_dir=ARCHIVE_DIR [--debug] [--config=CONFIG_FILE_PATH] [--version]
 
 optional arguments:
   -h, --help            show this help message and exit
