@@ -7,6 +7,7 @@ import re
 import argparse
 import logging
 import time
+import math
 from logging import warning, info, debug, error  # noqa: F401
 from prometheus_client import start_http_server
 from prometheus_client import Gauge
@@ -19,7 +20,7 @@ from pathlib import Path
 # -------------
 
 parser = argparse.ArgumentParser()
-parser.version = "0.1.0"
+parser.version = "0.2.0"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--config", help="walg config file path", action="store")
@@ -39,11 +40,8 @@ for key in logging.Logger.manager.loggerDict:
 
 archive_dir = args.archive_dir
 http_port = 9351
-DONE_WAL_RE = re.compile(r"^[A-F0-9]{24}\.done$")
 READY_WAL_RE = re.compile(r"^[A-F0-9]{24}\.ready$")
-
-# TODO:
-# * walg_last_basebackup_duration
+terminate = False
 
 # Base backup update
 # ------------------
@@ -66,33 +64,6 @@ def parse_date(date, fmt):
         fmt = fmt.replace('.%f', '')
         return datetime.datetime.strptime(date, fmt)
 
-
-def get_previous_wal(wal):
-    timeline = wal[0:8]
-    segment_low = int(wal[16:24], 16) - 1
-    segment_high = int(wal[8:16], 16) + (segment_low // 0x100)
-    segment_low = segment_low % 0x100
-    return '%s%08X%08X' % (timeline, segment_high, segment_low)
-
-
-def get_next_wal(wal):
-    timeline = wal[0:8]
-    segment_low = int(wal[16:24], 16) + 1
-    segment_high = int(wal[8:16], 16) + (segment_low // 0x100)
-    segment_low = segment_low % 0x100
-    return '%s%08X%08X' % (timeline, segment_high, segment_low)
-
-
-def is_before(a, b):
-    timeline_a = a[0:8]
-    timeline_b = b[0:8]
-    if timeline_a != timeline_b:
-        return False
-    a_int = int(a[8:16], 16) * 0x100 + int(a[16:24], 16)
-    b_int = int(b[8:16], 16) * 0x100 + int(b[16:24], 16)
-    return a_int < b_int
-
-
 def wal_diff(a, b):
     timeline_a = a[0:8]
     timeline_b = b[0:8]
@@ -101,6 +72,21 @@ def wal_diff(a, b):
     a_int = int(a[8:16], 16) * 0x100 + int(a[16:24], 16)
     b_int = int(b[8:16], 16) * 0x100 + int(b[16:24], 16)
     return a_int - b_int
+
+def convert_size(size_bytes):
+    if size_bytes == 0:
+       return "0B"
+
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return "%s %s" % (s, size_name[i])
+
+def signal_handler(sig, frame):
+    global terminate
+    info('SIGTERM received, preparing to shutdown')
+    terminate = True
 
 class Exporter():
     def __init__(self):
@@ -111,9 +97,17 @@ class Exporter():
         self.archive_status = None
 
         # Declare metrics
-        self.basebackup = Gauge('walg_basebackup',
-                                'Remote Basebackups',
-                                ['start_wal_segment', 'start_lsn'])
+        self.basebackup = Gauge('walg_basebackup', 'Remote Basebackups',
+                                [
+                                    'start_wal_segment',
+                                    'start_lsn',
+                                    'finish_lsn',
+                                    'is_permanent',
+                                    'uncompressed_size',
+                                    'compressed_size',
+                                    'start_time',
+                                    'finish_time'
+                                ])
         self.basebackup_count = Gauge('walg_basebackup_count',
                                       'Remote Basebackups count')
         self.basebackup_count.set_function(lambda: len(self.bbs))
@@ -138,9 +132,9 @@ class Exporter():
         self.xlog_ready.set_function(self.xlog_ready_callback)
 
         self.exception = Gauge('walg_exception',
-                               'Wal-g exception: 2 for basebackup error, '
-                               '3 for xlog error and '
-                               '5 for remote error')
+                               'Wal-g exception: 1 for basebackup error, '
+                               '2 for xlog error and '
+                               '3 for both errors')
         self.exception.set_function(
             lambda: (1 if self.basebackup_exception else 0 +
                      2 if self.xlog_exception else 0))
@@ -160,9 +154,6 @@ class Exporter():
         self.wal_integrity_status = Gauge('walg_wal_integrity_status', 'Overall WAL archive integrity status', ['status'])
         self.wal_archive_count = Gauge('walg_wal_archive_count', 'Total WAL archived count from oldest to latest full backup')
         self.wal_archive_missing_count = Gauge('walg_wal_archive_missing_count', 'Total missing WAL count')
-
-        # Fetch remote base backups
-        self.update_basebackup()
 
     def update_wal_status(self):
         try:
@@ -198,7 +189,7 @@ class Exporter():
                     wal_archive_missing_count = wal_archive_missing_count + timelines['segments_count']
 
             # Get archive status from database
-            archive_status = self.get_archive_status()
+            archive_status = self._last_archive_status()
 
             # Log WAL informations
             info("WAL integrity status is: %s", wal_archive_integrity_status)
@@ -224,12 +215,9 @@ class Exporter():
             self.wal_archive_count.set(0)
 
     def update_basebackup(self, *unused):
-        """
-            When this script receive a SIGHUP signal, it will call backup-list
-            and update metrics about basebackups
-        """
 
         info('Updating basebackups metrics...')
+
         try:
             # Fetch remote backup list
             command = ["wal-g", "backup-list",
@@ -262,7 +250,13 @@ class Exporter():
             for bb in new_bbs:
                 if bb['backup_name'] not in old_bbs_name:
                     (self.basebackup.labels(bb['wal_file_name'],
-                                            bb['start_lsn'])
+                                            bb['start_lsn'],
+                                            bb['finish_lsn'],
+                                            bb['is_permanent'],
+                                            convert_size(bb['uncompressed_size']),
+                                            convert_size(bb['compressed_size']),
+                                            bb['start_time'],
+                                            bb['finish_time'])
                      .set(bb['start_time'].timestamp()))
 
             if len(new_bbs) == 0:
@@ -272,6 +266,7 @@ class Exporter():
                 self.bbs = new_bbs
                 info("%s basebackups found (first: %s, last: %s), %s deleted",
                      len(self.bbs),
+                     self.bbs[0]['start_time'],
                      self.bbs[len(self.bbs) - 1]['start_time'],
                      bb_deleted)
 
@@ -344,6 +339,9 @@ if __name__ == '__main__':
     info("Startup...")
     info('My PID is: %s', os.getpid())
 
+    # Registering the signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, signal_handler)
+
     info('Load configuration in /etc/default/walg.env')
     dotenv_path = Path('/etc/default/walg.env')
     load_dotenv(dotenv_path=dotenv_path)
@@ -357,10 +355,16 @@ if __name__ == '__main__':
     walg_exporter_scrape_interval = os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60)
 
     # Start up the server to expose the metrics.
+    info('Starting up the server')
     start_http_server(http_port)
+    info('Server running in port: %s', http_port)
 
     # Check if this is a master instance
     while True:
+        if terminate:
+                info('Received SIGTERM, shutting down')
+                break
+
         try:
             with psycopg2.connect(
                 host = dbhost,
@@ -376,17 +380,42 @@ if __name__ == '__main__':
                     info("Is in recovery mode? %s", result[0])
                     break
         except Exception:
+            if terminate:
+                info('Received SIGTERM during exception, shutting down')
+                break
+
             error("Unable to connect postgres server, retrying in 60sec...")
-            time.sleep(60)
+            time.sleep(walg_exporter_scrape_interval)
 
-    # Launch exporter
-    exporter = Exporter()
 
-    # listen to SIGHUP signal
-    signal.signal(signal.SIGHUP, exporter.update_basebackup)
+    first_start = True
 
     while True:
-        # Periodically update backup-list
-        exporter.update_basebackup()
-        exporter.update_wal_status()
-        time.sleep(walg_exporter_scrape_interval)
+        if terminate:
+                info('Received SIGTERM, shutting down')
+                break
+
+        try:
+            flag_enable = os.path.isfile('/var/lib/postgresql/walg_exporter.enable')
+
+            if flag_enable:
+                if first_start:
+                    # Launch exporter 
+                    # then set first_start to False so it won't re-initialize Exporter()
+                    exporter = Exporter()
+                    first_start = False
+
+                exporter.update_basebackup()
+                exporter.update_wal_status()
+
+                time.sleep(walg_exporter_scrape_interval)
+            else:
+                info('WAL-G exporter is disabled. Waiting to be enabled.')
+                break
+        except Exception as e:
+            if terminate:
+                info('Received SIGTERM during exception, shutting down')
+                break
+
+            error('Error occured, retrying in %s seconds' + walg_exporter_scrape_interval + str(e))
+            time.sleep(walg_exporter_scrape_interval)
