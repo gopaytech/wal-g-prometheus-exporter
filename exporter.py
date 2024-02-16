@@ -417,5 +417,5 @@ if __name__ == '__main__':
                 info('Received SIGTERM during exception, shutting down')
                 break
 
-            error('Error occured, retrying in %s seconds' + walg_exporter_scrape_interval + str(e))
+            error('Error occured, retrying in %s seconds. Err: %s', walg_exporter_scrape_interval, str(e))
             time.sleep(walg_exporter_scrape_interval)
