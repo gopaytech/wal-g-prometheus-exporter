@@ -15,7 +15,7 @@ build-binary:
 	  mv dist/exporter wal-g-exporter
 
 build-binary-mysql:
-	pip3 install -r requirements.txt
+	pip3 install -r <(grep -v "psycopg2" requirements.txt)
 	pyinstaller --onefile mysql/mysql_exporter.py && \
 	  mv dist/exporter wal-g-exporter
 
