@@ -14,5 +14,11 @@ build-binary:
 	pyinstaller --onefile exporter.py && \
 	  mv dist/exporter wal-g-exporter
 
+build-binary-mysql:
+	pip3 install -r requirements.txt
+	pyinstaller --onefile mysql/mysql_exporter.py && \
+	  mv dist/exporter wal-g-exporter
+
 compress:
 	tar -zcvf wal-g-exporter.linux-amd64.tar.gz wal-g-exporter
+
