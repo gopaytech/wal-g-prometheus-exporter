@@ -19,6 +19,9 @@ from pathlib import Path
 # Configuration
 # -------------
 
+# WAL-G binary location (configurable via walg.env or environment variable)
+WALG_BINARY_PATH = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
+
 parser = argparse.ArgumentParser()
 parser.version = "0.2.0"
 parser.add_argument("--archive_dir",
@@ -157,7 +160,7 @@ class Exporter():
 
     def update_wal_status(self):
         try:
-            command = ["wal-g", 'wal-verify', 'integrity', '--json']
+            command = [WALG_BINARY_PATH, 'wal-verify', 'integrity', '--json']
             if args.config:
                 command.extend(["--config", args.config])
 
@@ -220,7 +223,7 @@ class Exporter():
 
         try:
             # Fetch remote backup list
-            command = ["wal-g", "backup-list",
+            command = [WALG_BINARY_PATH, "backup-list",
                                   "--detail", "--json"]
             if args.config:
                 command.extend(["--config", args.config])
