@@ -26,4 +26,4 @@ build-binary-mysql:
 compress:
 	tar -zcvf wal-g-exporter.linux-amd64.tar.gz wal-g-exporter
 
-include Makefile.mysql
+#include Makefile.mysql
