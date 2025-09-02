@@ -396,6 +396,8 @@ if __name__ == '__main__':
     info('Exporter listening on %d', http_port)
 
     # Connectivity warm-up
+    db_auth_plugin = os.getenv('MYSQL_AUTH_PLUGIN', 'caching_sha2_password')
+    db_use_pure = os.getenv('MYSQL_USE_PURE', 'True').lower() in ('1', 'true', 'yes', 'on')
     while True:
         if terminate:
             info('Terminating before initial connection')
@@ -407,6 +409,8 @@ if __name__ == '__main__':
                 user=dbuser,
                 password=dbpassword,
                 database=dbname,
+                auth_plugin=db_auth_plugin,
+                use_pure=db_use_pure,
             ) as conn:
                 with conn.cursor() as c:
                     c.execute("SELECT 1")

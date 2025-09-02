@@ -15,10 +15,15 @@ build-binary:
 	  mv dist/exporter wal-g-exporter
 
 build-binary-mysql:
-	pip3 install -r <(grep -v "psycopg2" requirements.txt)
-	pyinstaller --onefile mysql/mysql_exporter.py && \
-	  mv dist/exporter wal-g-exporter
+	grep -v "psycopg2" requirements.txt | pip3 install -r /dev/stdin
+	pyinstaller --onefile \
+		--hidden-import=prometheus_client \
+		--hidden-import=dotenv \
+		--hidden-import=mysql.connector \
+		mysql/mysql_exporter.py
+	mv dist/mysql_exporter wal-g-exporter-mysql
 
 compress:
 	tar -zcvf wal-g-exporter.linux-amd64.tar.gz wal-g-exporter
 
+include Makefile.mysql
