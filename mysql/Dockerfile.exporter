@@ -24,4 +24,4 @@ ARG EXPORTER_BUILD_TS
 COPY --from=walgbinary /usr/local/bin/wal-g /usr/local/bin/wal-g
 RUN chmod +x /usr/local/bin/wal-g || true
 EXPOSE 9352
-ENTRYPOINT ["python","mysql_exporter.py","--archive_dir","/var/lib/mysql"]
+ENTRYPOINT []

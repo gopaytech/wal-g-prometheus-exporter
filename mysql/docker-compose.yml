@@ -1,9 +1,10 @@
+version: '3.8'
 services:
   mysql-ubuntu:
     platform: linux/amd64
     build:
       context: ..
-      dockerfile: mysql/Dockerfile.ubuntu22-walg
+      dockerfile: mysql/Dockerfile
       args:
         TARGETARCH: amd64
     container_name: mysql-ubuntu-walg
@@ -17,7 +18,7 @@ services:
       - 3310:3306
     volumes:
       - ubuntu-mysql-data:/var/lib/mysql
-      - ./wal-g-config:/etc/wal-g:ro
+      - ../config:/etc/wal-g:ro
       - ubuntu-walg-archive:/var/lib/walg
 
   mysql-walg-exporter:
@@ -27,24 +28,19 @@ services:
       dockerfile: mysql/Dockerfile.exporter
     container_name: walg-mysql-exporter-ubuntu
     environment:
-      MYSQL_HOST: mysql-ubuntu
-      MYSQL_PORT: 3306
-      MYSQL_USER: root
-      MYSQL_PASSWORD: secret
-      MYSQL_DATABASE: mysql
-      WALG_EXPORTER_SCRAPE_INTERVAL: 30
       WALG_EXPORTER_ENABLE: 'true'
       WALG_FILE_PREFIX: /var/lib/walg
       WALG_MYSQL_DATASOURCE_NAME: root:secret@tcp(mysql-ubuntu:3306)/
       # Disable binlog integrity verification (noisy / experimental). Set "true" to enable.
       WALG_EXPORTER_ENABLE_BINLOG_VERIFY: "true"
+    command: ["python3", "mysql_exporter.py", "--archive_dir", "/var/lib/mysql", "--config", "/etc/wal-g/mysql/wal-g-exporter.conf"]
     depends_on:
       - mysql-ubuntu
     ports:
       - "19352:9352"
     volumes:
       - ubuntu-mysql-data:/var/lib/mysql:ro
-      - ./wal-g-config:/etc/wal-g:ro
+      - ../config:/etc/wal-g:ro
       - ubuntu-walg-archive:/var/lib/walg:ro
 
 volumes:

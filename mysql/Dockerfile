@@ -80,8 +80,8 @@ until mysqladmin ping >/dev/null 2>&1 || [ $tries -le 0 ]; do
   sleep 1; tries=$((tries-1))
 done
 if [ -n "$MYSQL_ROOT_PASSWORD" ]; then
-  echo "Setting root password" >&2
-  mysql -uroot -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}'; FLUSH PRIVILEGES;" || true
+  echo "Setting root password (caching_sha2_password)" >&2
+  mysql -uroot -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '${MYSQL_ROOT_PASSWORD}'; FLUSH PRIVILEGES;" || true
 fi
 mysqladmin -uroot${MYSQL_ROOT_PASSWORD:+ -p$MYSQL_ROOT_PASSWORD} shutdown || kill $pid || true
 exec mysqld --datadir=/var/lib/mysql --user=mysql

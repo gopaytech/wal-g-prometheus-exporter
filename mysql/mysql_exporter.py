@@ -10,22 +10,26 @@ import time
 import math
 from logging import info, error
 from prometheus_client import start_http_server, Gauge
-import mysql.connector
+import pymysql  # CHANGED: Use pymysql instead of mysql.connector
 from dotenv import load_dotenv
 from pathlib import Path
+import configparser
 
 # ------------------
 # CLI / Config
 # ------------------
-WALG_BINARY_PATH = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
+config_mysql = {}
+config_exporter = {}
+walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 parser = argparse.ArgumentParser()
-parser.version = "0.1.0"
+parser.version = "0.3.1"
 parser.add_argument("--archive_dir",
                     help="MySQL binlog directory (usually datadir)",
                     action="store", required=True)
 parser.add_argument("--config", help="wal-g config file path", action="store")
 parser.add_argument("--debug", help="enable debug log", action="store_true")
 parser.add_argument("--version", help="show binary version", action="version")
+
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
@@ -33,8 +37,18 @@ for key in logging.Logger.manager.loggerDict:
     if key != 'root':
         logging.getLogger(key).setLevel(logging.WARNING)
 
+# Load config file if provided
+if args.config:
+    config = configparser.ConfigParser()
+    config.read(args.config)
+    if 'mysql' in config:
+        config_mysql = dict(config['mysql'])
+    if 'exporter' in config:
+        config_exporter = dict(config['exporter'])
+
 archive_dir = args.archive_dir
-http_port = 9352
+# Exporter port: config file > env > default
+http_port = int(config_exporter.get('port', os.getenv('EXPORTER_PORT', 9351)))
 BINLOG_RE = re.compile(r"^mysql-bin\.[0-9]{6}$")
 terminate = False
 
@@ -150,7 +164,7 @@ class MySQLExporter:
             self._fallback_binlog_count()
             return
         try:
-            command = [WALG_BINARY_PATH, 'binlog-verify', 'integrity', '--json']
+            command = [walg_binary_path, 'binlog-verify', 'integrity', '--json']
             if args.config:
                 command.extend(["--config", args.config])
             res = subprocess.run(command, capture_output=True, check=True)
@@ -221,7 +235,7 @@ class MySQLExporter:
     def update_basebackup(self):
         info('Updating MySQL basebackup metrics...')
         try:
-            cmd = [WALG_BINARY_PATH, "backup-list", "--detail", "--json"]
+            cmd = [walg_binary_path, "backup-list", "--detail", "--json"]
             if args.config:
                 cmd.extend(["--config", args.config])
             try:
@@ -322,26 +336,36 @@ class MySQLExporter:
 
     def _last_archive_status(self):
         # Map MySQL binlog info to expected fields
-        with mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST', 'localhost'),
-            port=int(os.getenv('MYSQL_PORT', '3306')),
-            user=os.getenv('MYSQL_USER', 'root'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DATABASE', 'mysql'),
-        ) as conn:
-            with conn.cursor(dictionary=True) as c:
-                c.execute('SHOW MASTER STATUS')
-                row = c.fetchone()
-                if not row:
+        try:
+            conn = pymysql.connect(  # CHANGED: Use pymysql
+                host=os.getenv('MYSQL_HOST', 'localhost'),
+                port=int(os.getenv('MYSQL_PORT', '3306')),
+                user=os.getenv('MYSQL_USER', 'root'),
+                password=os.getenv('MYSQL_PASSWORD', ''),
+                database=os.getenv('MYSQL_DATABASE', 'mysql'),
+                charset='utf8mb4',
+                connect_timeout=10
+            )
+            with conn:
+                with conn.cursor(pymysql.cursors.DictCursor) as c:  # CHANGED: Use pymysql cursor
+                    c.execute('SHOW MASTER STATUS')
+                    row = c.fetchone()
+                    if not row:
+                        return {
+                            'last_archived_file': None,
+                            'last_archived_time': None
+                        }
                     return {
-                        'last_archived_file': None,
-                        'last_archived_time': None
+                        'last_archived_file': row.get('File'),
+                        # Using current time as proxy – MySQL does not track file archived time
+                        'last_archived_time': datetime.datetime.now(datetime.timezone.utc)
                     }
-                return {
-                    'last_archived_file': row.get('File'),
-                    # Using current time as proxy – MySQL does not track file archived time
-                    'last_archived_time': datetime.datetime.now(datetime.timezone.utc)
-                }
+        except Exception as e:
+            error(f"Error getting archive status: {e}")
+            return {
+                'last_archived_file': None,
+                'last_archived_time': None
+            }
 
     # ------------- Metric callbacks -------------
     def last_binlog_upload_callback(self):
@@ -385,33 +409,40 @@ if __name__ == '__main__':
     if dotenv_path.exists():
         load_dotenv(dotenv_path=dotenv_path)
 
-    dbhost = os.getenv('MYSQL_HOST', 'localhost')
-    dbport = os.getenv('MYSQL_PORT', '3306')
-    dbuser = os.getenv('MYSQL_USER', 'root')
-    dbpassword = os.getenv('MYSQL_PASSWORD')
-    dbname = os.getenv('MYSQL_DATABASE', 'mysql')
-    scrape_interval = int(os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60))
+    # MySQL connection params: config file > env > default
+    # Always use config file values if present, else fallback to env/defaults
+    dbhost = config_mysql.get('host') or os.getenv('MYSQL_HOST', 'localhost')
+    dbport = config_mysql.get('port') or os.getenv('MYSQL_PORT', '3306')
+    dbuser = config_mysql.get('user') or os.getenv('MYSQL_USER', 'root')
+    dbpassword = config_mysql.get('password') or os.getenv('MYSQL_PASSWORD', '')
+    dbname = config_mysql.get('database') or os.getenv('MYSQL_DATABASE', 'mysql')
+    scrape_interval = int(config_exporter.get('walg_exporter_scrape_interval') or os.getenv('WALG_EXPORTER_SCRAPE_INTERVAL', 60))
+    ssl_disabled = str(config_mysql.get('ssl_disabled', 'false')).lower() in ('1', 'true', 'yes', 'on')
+
+    info(f"MySQL connection params: host={dbhost}, port={dbport}, user={dbuser}, db={dbname}, ssl_disabled={ssl_disabled}")
 
     start_http_server(http_port)
     info('Exporter listening on %d', http_port)
 
-    # Connectivity warm-up
-    db_auth_plugin = os.getenv('MYSQL_AUTH_PLUGIN', 'caching_sha2_password')
-    db_use_pure = os.getenv('MYSQL_USE_PURE', 'True').lower() in ('1', 'true', 'yes', 'on')
+    # Connectivity warm-up - CHANGED: Use pymysql
     while True:
         if terminate:
             info('Terminating before initial connection')
             exit(0)
         try:
-            with mysql.connector.connect(
+            conn_args = dict(
                 host=dbhost,
                 port=int(dbport),
                 user=dbuser,
                 password=dbpassword,
                 database=dbname,
-                auth_plugin=db_auth_plugin,
-                use_pure=db_use_pure,
-            ) as conn:
+                charset='utf8mb4',
+                connect_timeout=10
+            )
+            if ssl_disabled:
+                conn_args['ssl'] = None
+            conn = pymysql.connect(**conn_args)
+            with conn:
                 with conn.cursor() as c:
                     c.execute("SELECT 1")
                     c.fetchone()

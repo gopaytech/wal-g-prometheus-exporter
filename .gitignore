@@ -8,3 +8,4 @@ __pycache__/
 .*.swp
 exporter.spec
 Makefile.mysql
+*.bak

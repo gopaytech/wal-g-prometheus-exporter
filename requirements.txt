@@ -3,4 +3,3 @@ prometheus_client
 psycopg2
 pyinstaller
 python-dotenv
-mysql-connector-python
