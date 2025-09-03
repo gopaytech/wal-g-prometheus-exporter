@@ -24,8 +24,9 @@ build-binary-mysql:
 		mysql/mysql_exporter.py
 	mv dist/mysql_exporter wal-g-exporter-mysql
 
-compress:
+compress-pg:
 	tar -zcvf wal-g-exporter.linux-amd64.tar.gz wal-g-exporter
+compress-mysql:	
 	tar -xcvf wal-g-exporter-mysql.linux-amd64.tar.gz wal-g-exporter-mysql
 
 include mysql/Makefile.mysql
