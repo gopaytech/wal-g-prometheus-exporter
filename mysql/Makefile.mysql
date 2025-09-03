@@ -1,0 +1,86 @@
+.PHONY: mysql-up mysql-down mysql-reset mysql-metrics mysql-test mysql-test-full mysql-backup mysql-init mysql-binlog-verify-on mysql.up mysql.down mysql.reset mysql.metrics mysql.test mysql.test-full mysql.backup mysql.init mysql.help mysql.binlog-verify-on
+
+# MySQL test stack (wal-g + exporter)
+MYSQL_COMPOSE?=mysql/docker-compose.yml
+
+mysql-up:
+	docker compose -f $(MYSQL_COMPOSE) up -d --build
+	@echo "Waiting for exporter metrics..."; \
+	for i in $$(seq 1 30); do \
+		if curl -fsS http://localhost:19352/metrics >/dev/null 2>&1; then echo "Exporter is up"; break; fi; \
+		sleep 2; \
+		if [ $$i -eq 30 ]; then echo "Timed out waiting for exporter"; exit 1; fi; \
+	done
+
+mysql-down:
+	docker compose -f $(MYSQL_COMPOSE) down --remove-orphans
+
+mysql-reset:
+	docker compose -f $(MYSQL_COMPOSE) down -v --remove-orphans || true
+	docker volume prune -f >/dev/null || true
+	docker container prune -f >/dev/null || true
+
+# Explicit orphan cleanup without touching volumes
+mysql-clean:
+	docker compose -f $(MYSQL_COMPOSE) down --remove-orphans || true
+
+# Restart only the exporter service
+mysql-exporter-restart:
+	docker compose -f $(MYSQL_COMPOSE) restart mysql-walg-exporter
+
+mysql-metrics:
+	curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|binlog_files_present|last_upload)'
+
+# Troubleshooting:
+# If exporter cannot connect to MySQL, run these commands inside the MySQL container:
+# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'secret';"
+# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
+# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "FLUSH PRIVILEGES;"
+
+mysql-test: mysql-reset mysql-up
+	@echo "Basebackup count:"; curl -s http://localhost:19352/metrics | grep walg_mysql_basebackup_count || true
+	@echo "Listing backups via wal-g inside MySQL container:"; docker exec mysql-ubuntu-walg wal-g backup-list --detail --json || docker exec mysql-ubuntu-walg wal-g backup-list || true
+
+# Full test including seeding data and creating an initial backup
+mysql-test-full: mysql-reset mysql-up mysql-init mysql-backup mysql-exporter-restart
+	@echo "Post-backup metrics snapshot:"; curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|last_backup_duration|binlog_files_present)' || true
+
+mysql-init:
+	# Wait for MySQL TCP readiness then create sample DB, table, data, and grant remote root
+	@echo "Waiting for MySQL readiness..."; \
+	for i in $$(seq 1 30); do \
+		if docker exec mysql-ubuntu-walg mysqladmin -uroot -psecret -h127.0.0.1 ping --silent >/dev/null 2>&1; then echo "MySQL is ready"; break; fi; \
+		sleep 2; \
+		if [ $$i -eq 30 ]; then echo "Timed out waiting for MySQL"; exit 1; fi; \
+	done
+	docker exec -i mysql-ubuntu-walg mysql -uroot -psecret -h127.0.0.1 --protocol=TCP < mysql/entrypoint/mysql-init.sql
+mysql-backup:
+	# Run physical backup to file backend using xtrabackup
+	docker exec mysql-ubuntu-walg bash -lc 'export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql --user=root --password=secret"; wal-g backup-push /var/lib/mysql'
+	@echo "Current backups:"; docker exec mysql-ubuntu-walg wal-g backup-list --detail --json || docker exec mysql-ubuntu-walg wal-g backup-list || true
+
+mysql-binlog-verify-on:
+	# Recreate exporter enabling binlog integrity verification
+	docker compose -f $(MYSQL_COMPOSE) down mysql-walg-exporter || true
+	docker compose -f $(MYSQL_COMPOSE) up -d --build --force-recreate -e WALG_EXPORTER_ENABLE_BINLOG_VERIFY=true mysql-walg-exporter
+
+
+# Namespaced aliases
+mysql.up: mysql-up
+mysql.down: mysql-down
+mysql.reset: mysql-reset
+mysql.metrics: mysql-metrics
+mysql.test: mysql-test
+mysql.test-full: mysql-test-full
+
+mysql-help:
+	@echo "MySQL wal-g test targets:"; \
+	echo "  make mysql-up / mysql.up        - start stack"; \
+	echo "  make mysql-down / mysql.down    - stop stack"; \
+	echo "  make mysql-reset / mysql.reset  - reset stack (remove volumes)"; \
+	echo "  make mysql-metrics / mysql.metrics - show key metrics"; \
+	echo "  make mysql-test / mysql.test    - reset, start, show backup info"; \
+	echo "  make mysql-test-full / mysql.test-full - full cycle: reset, start, init, backup, metrics"; \
+	echo "  make mysql-init / mysql.init    - seed sample data"; \
+	echo "  make mysql-backup / mysql.backup - run physical backup"; \
+	echo "  make mysql-binlog-verify-on / mysql.binlog-verify-on - enable binlog verify for exporter";

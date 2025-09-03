@@ -1,6 +1,6 @@
 # wal-g-prometheus-exporter
 
-Exporter for WAL-G that runs in PostgreSQL instances.
+Exporter for WAL-G that runs in PostgreSQL and MySQL instances.
 
 ## Requirements
 
@@ -11,9 +11,12 @@ Exporter for WAL-G that runs in PostgreSQL instances.
   This flag file feature can be used in case when there is a failover event happens, for example if the exporter supposed to be run only in master node.
 
 ## Build
-
+For PostgreSQL 
 1. For Linux, you can use the binary from `make build`. It should run on most Linux distro.
 2. For specific OS or to run in your own machine, you can get the binary with `make build-binary` and use the binary output.
+
+For MySQL
+1. For specific OS or to run in your own machine, you can get the binary with `make build-binary-mysql` and use the binary output.
 
 ## Usage
 
@@ -30,7 +33,7 @@ optional arguments:
   --version             show binary version
 ```
 
-## Exposed Metrics
+## Exposed Metrics for PostgreSQL
 
 ```
 # HELP walg_basebackup Remote Basebackups
@@ -69,4 +72,44 @@ walg_wal_archive_count 2717.0
 # HELP walg_wal_archive_missing_count Total missing WAL count
 # TYPE walg_wal_archive_missing_count gauge
 walg_wal_archive_missing_count 0.0
+```
+
+## Exposed Metrics for MySQL
+```
+# HELP walg_mysql_basebackup Remote MySQL basebackups
+# TYPE walg_mysql_basebackup gauge
+walg_mysql_basebackup{backup_name="stream_20250829T180812Z",compressed_size="2.42 MB",finish_time="2025-08-29T18:08:22.633575Z",start_time="2025-08-29T18:08:12.786432Z",uncompressed_size="70.67 MB"} 1.756490902633575e+09
+walg_mysql_basebackup{backup_name="stream_20250902T045107Z",compressed_size="2.42 MB",finish_time="2025-09-02T04:51:14.349023Z",start_time="2025-09-02T04:51:07.009533Z",uncompressed_size="70.67 MB"} 1.756788674349023e+09
+# HELP walg_mysql_basebackup_count Remote MySQL basebackup count
+# TYPE walg_mysql_basebackup_count gauge
+walg_mysql_basebackup_count 2.0
+# HELP walg_mysql_last_upload Last upload of binlog or basebackup
+# TYPE walg_mysql_last_upload gauge
+walg_mysql_last_upload{type="binlog"} 1.756805109784997e+09
+walg_mysql_last_upload{type="basebackup"} 1.756788667009533e+09
+# HELP walg_mysql_oldest_basebackup Oldest MySQL basebackup
+# TYPE walg_mysql_oldest_basebackup gauge
+walg_mysql_oldest_basebackup 1.756490892786432e+09
+# HELP walg_mysql_binlog_files_present Binlog files present in archive_dir (not necessarily uploaded)
+# TYPE walg_mysql_binlog_files_present gauge
+walg_mysql_binlog_files_present 4.0
+# HELP walg_mysql_exception Wal-g exception: 1 basebackup, 2 binlog, 3 both
+# TYPE walg_mysql_exception gauge
+walg_mysql_exception 0.0
+# HELP walg_mysql_binlogs_since_basebackup Binlog index delta since last basebackup
+# TYPE walg_mysql_binlogs_since_basebackup gauge
+walg_mysql_binlogs_since_basebackup 6.0
+# HELP walg_mysql_last_backup_duration Duration seconds of last basebackup
+# TYPE walg_mysql_last_backup_duration gauge
+walg_mysql_last_backup_duration 7.33949
+# HELP walg_mysql_binlog_integrity_status Overall binlog archive integrity status
+# TYPE walg_mysql_binlog_integrity_status gauge
+walg_mysql_binlog_integrity_status{status="OK"} 0.0
+walg_mysql_binlog_integrity_status{status="FAILURE"} 0.0
+# HELP walg_mysql_binlog_archive_count Total binlog entries counted in wal-g integrity report
+# TYPE walg_mysql_binlog_archive_count gauge
+walg_mysql_binlog_archive_count 4.0
+# HELP walg_mysql_binlog_archive_missing_count Total missing binlog entries in wal-g report
+# TYPE walg_mysql_binlog_archive_missing_count gauge
+walg_mysql_binlog_archive_missing_count 0.0
 ```
