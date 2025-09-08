@@ -1,0 +1,27 @@
+FROM ubuntu:22.04 AS walgbinary
+ARG WAL_G_VERSION=v3.0.7
+ENV DEBIAN_FRONTEND=noninteractive TZ=UTC
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq bash coreutils && rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp
+RUN bash -lc 'set -euo pipefail; \
+	BIN=wal-g-mysql-ubuntu-22.04-amd64; \
+	base="https://github.com/wal-g/wal-g/releases/download/${WAL_G_VERSION}"; \
+	curl -sSL -o ${BIN} ${base}/${BIN}; \
+	curl -sSL -o ${BIN}.sha256 ${base}/${BIN}.sha256; \
+	sha256sum -c ${BIN}.sha256; \
+	install -m 0755 ${BIN} /usr/local/bin/wal-g; \
+	/usr/local/bin/wal-g --help | head -5 || true'
+
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates default-mysql-client && rm -rf /var/lib/apt/lists/*
+COPY mysql/requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt || pip install --no-cache-dir prometheus-client mysql-connector-python python-dotenv
+# Copy MySQL exporter
+COPY mysql/mysql_exporter.py ./mysql_exporter.py
+ARG EXPORTER_BUILD_TS
+COPY --from=walgbinary /usr/local/bin/wal-g /usr/local/bin/wal-g
+RUN chmod +x /usr/local/bin/wal-g || true
+EXPOSE 9352
+ENTRYPOINT []

@@ -1,0 +1,9 @@
+# Minimal WAL-G config for MySQL (adjust credentials/backends as needed)
+# This example uses local filesystem storage; replace with S3 settings if required.
+# For S3, set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, WALE_S3_PREFIX env vars.
+WALG_MYSQL_DATASOURCE: "root:secret@tcp(mysql:3306)/"
+# Uncomment and adjust for S3
+# WALE_S3_PREFIX: s3://walg-mysql/backup
+# AWS_ENDPOINT: http://minio:9000
+# AWS_S3_FORCE_PATH_STYLE: true
+# GPG_KEY_ID: ""
