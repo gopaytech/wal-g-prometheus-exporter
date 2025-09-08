@@ -49,7 +49,7 @@ if args.config:
 archive_dir = args.archive_dir
 # Exporter port: config file > env > default
 http_port = int(config_exporter.get('port', os.getenv('EXPORTER_PORT', 9351)))
-BINLOG_RE = re.compile(r"^mysql-bin\.[0-9]{6}$")
+BINLOG_RE = re.compile(r"^(?:mysql-bin|binlog)\.[0-9]{6}$")
 terminate = False
 
 
@@ -248,7 +248,7 @@ class MySQLExporter:
                     new_bbs = [parse_backup_dates(bb) for bb in raw_bbs]
             except subprocess.CalledProcessError:
                 # Fallback: plain text parsing (MySQL wal-g may not support --json)
-                fallback_cmd = ["wal-g", "backup-list"]
+                fallback_cmd = [walg_binary_path, "backup-list"]
                 if args.config:
                     fallback_cmd.extend(["--config", args.config])
                 res = subprocess.run(fallback_cmd, capture_output=True, check=True)

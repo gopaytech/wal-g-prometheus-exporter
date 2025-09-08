@@ -31,12 +31,6 @@ mysql-exporter-restart:
 mysql-metrics:
 	curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|binlog_files_present|last_upload)'
 
-# Troubleshooting:
-# If exporter cannot connect to MySQL, run these commands inside the MySQL container:
-# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'secret';"
-# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;"
-# docker exec mysql-ubuntu-walg mysql -uroot -psecret -e "FLUSH PRIVILEGES;"
-
 mysql-test: mysql-reset mysql-up
 	@echo "Basebackup count:"; curl -s http://localhost:19352/metrics | grep walg_mysql_basebackup_count || true
 	@echo "Listing backups via wal-g inside MySQL container:"; docker exec mysql-ubuntu-walg wal-g backup-list --detail --json || docker exec mysql-ubuntu-walg wal-g backup-list || true

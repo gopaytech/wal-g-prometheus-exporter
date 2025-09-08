@@ -51,7 +51,7 @@ COPY --from=walgbinary /usr/local/bin/wal-g /usr/local/bin/wal-g
 RUN chmod +x /usr/local/bin/wal-g || true
 
 # Binlog config for wal-g
-RUN bash -c 'echo -e "[mysqld]\nserver_id=1\nlog_bin=mysql-bin\nbinlog_format=ROW\nbinlog_expire_logs_seconds=3600\n" > /etc/mysql/mysql.conf.d/99-binlog-walg.cnf'
+COPY mysql/config/99-binlog-walg.cnf /etc/mysql/mysql.conf.d/99-binlog-walg.cnf
 
 # Network override: listen on all interfaces for exporter/container access
 RUN bash -c 'echo -e "[mysqld]\nbind-address=0.0.0.0\nmysqlx-bind-address=0.0.0.0\n" > /etc/mysql/mysql.conf.d/10-network.cnf'
