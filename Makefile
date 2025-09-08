@@ -22,7 +22,7 @@ build-binary-mysql:
 		--hidden-import=pymysql \
 		--hidden-import=cryptography \
 		mysql/mysql_exporter.py
-	mv dist/mysql_exporter wal-g-exporter
+	mv dist/mysql_exporter wal-g-exporter-mysql
 
 compress-pg:
 	tar -zcvf wal-g-exporter.linux-amd64.tar.gz wal-g-exporter
