@@ -86,7 +86,7 @@ def parse_backup_dates(bb):
     return bb
 
 
-class MySQLExporterV2:
+class MySQLExporter:
     def __init__(self, conn_args):
         self.conn_args = conn_args
         self.basebackup_exception = False
@@ -267,7 +267,7 @@ class MySQLExporterV2:
 
 
 def main():
-    info("Startup MySQL WAL-G exporter v2...")
+    info("Startup MySQL WAL-G exporter")
     signal.signal(signal.SIGTERM, signal_handler)
 
     dotenv_path = Path('/etc/default/walg.env')
@@ -286,7 +286,7 @@ def main():
     if ssl_disabled:
         conn_args['ssl'] = None
 
-    exporter = MySQLExporterV2(conn_args)
+    exporter = MySQLExporter(conn_args)
     # Add dynamic exception gauge (value provided via function)
     exporter.basebackup_exception_flag.set_function(exporter.basebackup_exception_status)
 

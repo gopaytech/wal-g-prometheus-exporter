@@ -20,6 +20,14 @@ services:
       - ubuntu-mysql-data:/var/lib/mysql
       - ../config:/etc/wal-g:ro
       - ubuntu-walg-archive:/var/lib/walg
+      - ./entrypoint:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-psecret"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+  # Mount init scripts handled in single volumes block above
 
   mysql-walg-exporter:
     platform: linux/amd64
@@ -35,7 +43,8 @@ services:
       WALG_EXPORTER_ENABLE_BINLOG_VERIFY: "true"
     command: ["python3", "mysql_exporter.py", "--archive_dir", "/var/lib/mysql", "--config", "/etc/wal-g/mysql/wal-g-exporter.conf"]
     depends_on:
-      - mysql-ubuntu
+      mysql-ubuntu:
+        condition: service_healthy
     ports:
       - "19352:9352"
     volumes:
