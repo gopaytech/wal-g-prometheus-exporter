@@ -29,14 +29,14 @@ mysql-exporter-restart:
 	docker compose -f $(MYSQL_COMPOSE) restart mysql-walg-exporter
 
 mysql-metrics:
-	curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|binlog_files_present|last_upload)'
+	curl -s http://localhost:19352/metrics | grep -E 'walg_mysql'
 
 mysql-test: mysql-reset mysql-up
-	@echo "Basebackup count:"; curl -s http://localhost:19352/metrics | grep walg_mysql_basebackup_count || true
+	@echo "Basebackup count:"; curl -s http://localhost:19352/metrics | grep walg || true
 	@echo "Listing backups via wal-g inside MySQL container:"; docker exec mysql-ubuntu-walg wal-g backup-list --detail --json || docker exec mysql-ubuntu-walg wal-g backup-list || true
 
 # Full test including seeding data and creating an initial backup
-mysql-test-full: mysql-reset mysql-up mysql-init mysql-backup mysql-exporter-restart
+mysql-test-full: mysql-reset mysql-up mysql-init mysql-backup mysql-exporter-restart mysql-binlog-push 
 	@echo "Post-backup metrics snapshot:"; curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|last_backup_duration|binlog_files_present)' || true
 
 mysql-init:
@@ -53,11 +53,9 @@ mysql-backup:
 	docker exec mysql-ubuntu-walg bash -lc 'export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql --user=root --password=secret"; wal-g backup-push /var/lib/mysql'
 	@echo "Current backups:"; docker exec mysql-ubuntu-walg wal-g backup-list --detail --json || docker exec mysql-ubuntu-walg wal-g backup-list || true
 
-mysql-binlog-verify-on:
-	# Recreate exporter enabling binlog integrity verification
-	docker compose -f $(MYSQL_COMPOSE) down mysql-walg-exporter || true
-	docker compose -f $(MYSQL_COMPOSE) up -d --build --force-recreate -e WALG_EXPORTER_ENABLE_BINLOG_VERIFY=true mysql-walg-exporter
-
+mysql-binlog-push:
+	# Push current binlogs to file backend
+	docker exec mysql-ubuntu-walg bash -lc 'wal-g binlog-push '
 
 # Namespaced aliases
 mysql.up: mysql-up
@@ -77,4 +75,3 @@ mysql-help:
 	echo "  make mysql-test-full / mysql.test-full - full cycle: reset, start, init, backup, metrics"; \
 	echo "  make mysql-init / mysql.init    - seed sample data"; \
 	echo "  make mysql-backup / mysql.backup - run physical backup"; \
-	echo "  make mysql-binlog-verify-on / mysql.binlog-verify-on - enable binlog verify for exporter";

@@ -78,38 +78,26 @@ walg_wal_archive_missing_count 0.0
 ```
 # HELP walg_mysql_basebackup Remote MySQL basebackups
 # TYPE walg_mysql_basebackup gauge
-walg_mysql_basebackup{backup_name="stream_20250829T180812Z",compressed_size="2.42 MB",finish_time="2025-08-29T18:08:22.633575Z",start_time="2025-08-29T18:08:12.786432Z",uncompressed_size="70.67 MB"} 1.756490902633575e+09
-walg_mysql_basebackup{backup_name="stream_20250902T045107Z",compressed_size="2.42 MB",finish_time="2025-09-02T04:51:14.349023Z",start_time="2025-09-02T04:51:07.009533Z",uncompressed_size="70.67 MB"} 1.756788674349023e+09
-# HELP walg_mysql_basebackup_count Remote MySQL basebackup count
+walg_mysql_basebackup{backup_name="stream_20250909T173557Z",compressed_size="2542957",finish_time="2025-09-09T17:36:04.995146Z",start_time="2025-09-09T17:35:57.973341Z",uncompressed_size="74101916"} 1.757439364995146e+09
+walg_mysql_basebackup{backup_name="stream_20250909T173746Z",compressed_size="2542840",finish_time="2025-09-09T17:37:55.645579Z",start_time="2025-09-09T17:37:46.636711Z",uncompressed_size="74101915"} 1.757439475645579e+09
+# HELP walg_mysql_basebackup_count Number of basebackups
 # TYPE walg_mysql_basebackup_count gauge
 walg_mysql_basebackup_count 2.0
-# HELP walg_mysql_last_upload Last upload of binlog or basebackup
-# TYPE walg_mysql_last_upload gauge
-walg_mysql_last_upload{type="binlog"} 1.756805109784997e+09
-walg_mysql_last_upload{type="basebackup"} 1.756788667009533e+09
-# HELP walg_mysql_oldest_basebackup Oldest MySQL basebackup
+# HELP walg_mysql_basebackup_exception 1 if basebackup retrieval failed else 0
+# TYPE walg_mysql_basebackup_exception gauge
+walg_mysql_basebackup_exception 0.0
+# HELP walg_mysql_oldest_basebackup Oldest basebackup start time (unix seconds)
 # TYPE walg_mysql_oldest_basebackup gauge
-walg_mysql_oldest_basebackup 1.756490892786432e+09
-# HELP walg_mysql_binlog_files_present Binlog files present in archive_dir (not necessarily uploaded)
-# TYPE walg_mysql_binlog_files_present gauge
-walg_mysql_binlog_files_present 4.0
-# HELP walg_mysql_exception Wal-g exception: 1 basebackup, 2 binlog, 3 both
-# TYPE walg_mysql_exception gauge
-walg_mysql_exception 0.0
-# HELP walg_mysql_binlogs_since_basebackup Binlog index delta since last basebackup
-# TYPE walg_mysql_binlogs_since_basebackup gauge
-walg_mysql_binlogs_since_basebackup 6.0
+walg_mysql_oldest_basebackup 1.757439357973341e+09
 # HELP walg_mysql_last_backup_duration Duration seconds of last basebackup
 # TYPE walg_mysql_last_backup_duration gauge
-walg_mysql_last_backup_duration 7.33949
-# HELP walg_mysql_binlog_integrity_status Overall binlog archive integrity status
-# TYPE walg_mysql_binlog_integrity_status gauge
-walg_mysql_binlog_integrity_status{status="OK"} 0.0
-walg_mysql_binlog_integrity_status{status="FAILURE"} 0.0
-# HELP walg_mysql_binlog_archive_count Total binlog entries counted in wal-g integrity report
-# TYPE walg_mysql_binlog_archive_count gauge
-walg_mysql_binlog_archive_count 4.0
-# HELP walg_mysql_binlog_archive_missing_count Total missing binlog entries in wal-g report
-# TYPE walg_mysql_binlog_archive_missing_count gauge
-walg_mysql_binlog_archive_missing_count 0.0
+walg_mysql_last_backup_duration 9.008868
+# HELP walg_mysql_latest_active_binlog Current active binlog file
+# TYPE walg_mysql_latest_active_binlog gauge
+walg_mysql_latest_active_binlog{file="mysql-bin.000003"} 1.0
+walg_mysql_latest_active_binlog{file="mysql-bin.000004"} 1.0
+# HELP walg_mysql_latest_uploaded_binlog Latest uploaded binlog file (wal-g storage)
+# TYPE walg_mysql_latest_uploaded_binlog gauge
+walg_mysql_latest_uploaded_binlog{file="mysql-bin.000002"} 1.0
+walg_mysql_latest_uploaded_binlog{file="mysql-bin.000003"} 1.0
 ```

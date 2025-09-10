@@ -1,6 +1,6 @@
 CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'secret'; 
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION; 
-CREATE USER 'walg_exporter'@'%' IDENTIFIED BY 'secret!';
+CREATE USER 'walg_exporter'@'%' IDENTIFIED BY '}7(fo%hb:XTddQkO';
 GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'walg_exporter'@'%';
 GRANT SELECT ON performance_schema.* TO 'walg_exporter'@'%';
 FLUSH PRIVILEGES; 
