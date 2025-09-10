@@ -46,7 +46,7 @@ services:
       mysql-ubuntu:
         condition: service_healthy
     ports:
-      - "19352:9352"
+      - "19351:9351"
     volumes:
       - ubuntu-mysql-data:/var/lib/mysql:ro
       - ../config:/etc/wal-g:ro
