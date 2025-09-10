@@ -41,12 +41,25 @@ for key in logging.Logger.manager.loggerDict:
         logging.getLogger(key).setLevel(logging.WARNING)
 
 if args.config:
-    cfg = configparser.ConfigParser()
-    cfg.read(args.config)
-    if 'mysql' in cfg:
-        config_mysql = dict(cfg['mysql'])
-    if 'exporter' in cfg:
-        config_exporter = dict(cfg['exporter'])
+    try:
+        # Use RawConfigParser to avoid % interpolation issues with passwords/secrets
+        cfg = configparser.RawConfigParser()
+        cfg.read(args.config)
+        if 'mysql' in cfg:
+            config_mysql = dict(cfg['mysql'])
+        if 'exporter' in cfg:
+            config_exporter = dict(cfg['exporter'])
+    except configparser.InterpolationSyntaxError as e:  # noqa: BLE001
+        error(f"Config interpolation error: {e}; retrying with strict=False fallback")
+        try:
+            cfg = configparser.ConfigParser(interpolation=None)
+            cfg.read(args.config)
+            if 'mysql' in cfg:
+                config_mysql = dict(cfg['mysql'])
+            if 'exporter' in cfg:
+                config_exporter = dict(cfg['exporter'])
+        except Exception as e2:  # noqa: BLE001
+            error(f"Failed to parse config after interpolation disable: {e2}")
 
 archive_dir = args.archive_dir
 http_port = args.port or int(config_exporter.get('port', os.getenv('EXPORTER_PORT', 9352)))
