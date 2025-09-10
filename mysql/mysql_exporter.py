@@ -315,6 +315,7 @@ def main():
     while True:
         try:
             conn = pymysql.connect(**conn_args)
+            info(f"Connected to MySQL at {dbhost}:{dbport} as {dbuser}, database {dbname}, password")
             with conn:
                 with conn.cursor() as c:
                     c.execute('SELECT 1')
