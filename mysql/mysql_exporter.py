@@ -22,8 +22,7 @@ parser.version = "0.3.1"
 parser.add_argument("--archive_dir", required=True, help="MySQL binlog directory (usually datadir)")
 parser.add_argument("--config", help="wal-g config file path")
 parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-parser.add_argument("--once", action="store_true", help="Run collection once then exit (debug/testing)")
-parser.add_argument("--port", type=int, help="HTTP listen port (override config/env)")
+parser.add_argument("--version", action="store_true", help="Show binary version")
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
@@ -91,20 +90,17 @@ else:
 
 archive_dir = args.archive_dir
 
-# HTTP listen port precedence: CLI > exporter.port > ENV EXPORTER_PORT > default
-if args.port:
-    http_port = args.port
-else:
-    http_port = None
-    for candidate in [config_exporter.get('port'), os.getenv('EXPORTER_PORT')]:
-        if candidate:
-            try:
-                http_port = int(candidate)
-                break
-            except ValueError:
-                error(f"Invalid port ignored: {candidate}")
-    if http_port is None:
-        http_port = 9351
+# HTTP listen port precedence: exporter.port > ENV EXPORTER_PORT > default
+http_port = None
+for candidate in [config_exporter.get('port'), os.getenv('EXPORTER_PORT')]:
+    if candidate:
+        try:
+            http_port = int(candidate)
+            break
+        except ValueError:
+            error(f"Invalid port ignored: {candidate}")
+if http_port is None:
+    http_port = 9351
 
 # Scrape interval precedence: exporter.walg_exporter_scrape_interval > ENV > default
 scrape_interval = None
@@ -376,8 +372,6 @@ def main():
             break
         except Exception as e:  # noqa: BLE001
             error(f"Initial DB connect failed: {e}")
-            if args.once:
-                return
             time.sleep(5)
 
     # Main loop
@@ -390,8 +384,6 @@ def main():
             exporter.update_binlogs()
         except Exception as e:  # noqa: BLE001
             error(f"Loop error: {e}")
-        if args.once:
-            break
         time.sleep(scrape_interval)
 
 
