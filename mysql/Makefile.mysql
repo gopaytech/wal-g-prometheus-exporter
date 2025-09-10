@@ -29,7 +29,7 @@ mysql-exporter-restart:
 	docker compose -f $(MYSQL_COMPOSE) restart mysql-walg-exporter
 
 mysql-metrics:
-	curl -s http://localhost:19352/metrics | grep -E 'walg_mysql'
+	curl -s http://localhost:19352/metrics | grep -E 'walg'
 
 mysql-test: mysql-reset mysql-up
 	@echo "Basebackup count:"; curl -s http://localhost:19352/metrics | grep walg || true
@@ -37,7 +37,7 @@ mysql-test: mysql-reset mysql-up
 
 # Full test including seeding data and creating an initial backup
 mysql-test-full: mysql-reset mysql-up mysql-init mysql-backup mysql-exporter-restart mysql-binlog-push 
-	@echo "Post-backup metrics snapshot:"; curl -s http://localhost:19352/metrics | grep -E 'walg_mysql_(basebackup_count|last_backup_duration|binlog_files_present)' || true
+	@echo "Post-backup metrics snapshot:"; curl -s http://localhost:19352/metrics | grep -E 'walg_(basebackup_count|last_backup_duration|binlog_files_present)' || true
 
 mysql-init:
 	# Wait for MySQL TCP readiness then create sample DB, table, data, and grant remote root
