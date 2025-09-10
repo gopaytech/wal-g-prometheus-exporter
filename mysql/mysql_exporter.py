@@ -108,14 +108,14 @@ class MySQLExporter:
         self.latest_active_binlog = None
 
         # Metrics
-        self.basebackup = Gauge('walg_mysql_basebackup', 'Remote MySQL basebackups',
+        self.basebackup = Gauge('walg_basebackup', 'Remote basebackups',
                                 ['backup_name', 'uncompressed_size', 'compressed_size', 'start_time', 'finish_time'])
-        self.basebackup_count = Gauge('walg_mysql_basebackup_count', 'Number of basebackups')
-        self.basebackup_exception_flag = Gauge('walg_mysql_basebackup_exception', '1 if basebackup retrieval failed else 0')
-        self.oldest_basebackup = Gauge('walg_mysql_oldest_basebackup', 'Oldest basebackup start time (unix seconds)')
-        self.last_backup_duration = Gauge('walg_mysql_last_backup_duration', 'Duration seconds of last basebackup')
-        self.latest_active_binlog_gauge = Gauge('walg_mysql_latest_active_binlog', 'Current active binlog file', ['file'])
-        self.latest_uploaded_binlog_gauge = Gauge('walg_mysql_latest_uploaded_binlog', 'Latest uploaded binlog file (wal-g storage)', ['file'])
+        self.basebackup_count = Gauge('walg_basebackup_count', 'Number of basebackups')
+        self.basebackup_exception_flag = Gauge('walg_basebackup_exception', '1 if basebackup retrieval failed else 0')
+        self.oldest_basebackup = Gauge('walg_oldest_basebackup', 'Oldest basebackup start time (unix seconds)')
+        self.last_backup_duration = Gauge('walg_last_backup_duration', 'Duration seconds of last basebackup')
+        self.latest_active_binlog_gauge = Gauge('walg_binlog_latest_active', 'Current active binlog file', ['file'])
+        self.latest_uploaded_binlog_gauge = Gauge('walg_binlog_latest_uploaded', 'Latest uploaded binlog file (wal-g storage)', ['file'])
 
         self.basebackup_count.set_function(lambda: len(self.bbs))
         self.oldest_basebackup.set_function(self._oldest_bb_callback)
