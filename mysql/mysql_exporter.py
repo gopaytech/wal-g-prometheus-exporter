@@ -27,7 +27,7 @@ config_exporter = {}
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.1.0"
+parser.version = "0.3.1"
 parser.add_argument("--archive_dir", required=True, help="MySQL binlog directory (usually datadir)")
 parser.add_argument("--config", help="wal-g config file path")
 parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -194,6 +194,11 @@ class MySQLExporter:
         new_bbs.sort(key=lambda x: x.get('start_time') or datetime.datetime.fromtimestamp(0, tz=datetime.timezone.utc))
         self.bbs = new_bbs
         self.basebackup_exception = False
+        if self.bbs:
+            info(f"{len(self.bbs)} basebackups found")
+        else:
+            info("No MySQL basebackups found")
+
 
     # ---- Binlogs ----
     def update_binlogs(self):
