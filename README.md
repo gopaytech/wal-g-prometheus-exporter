@@ -76,28 +76,27 @@ walg_wal_archive_missing_count 0.0
 
 ## Exposed Metrics for MySQL
 ```
-# HELP walg_basebackup Remote MySQL basebackups
+# HELP walg_basebackup Remote basebackups
 # TYPE walg_basebackup gauge
-walg_basebackup{backup_name="stream_20250909T173557Z",compressed_size="2542957",finish_time="2025-09-09T17:36:04.995146Z",start_time="2025-09-09T17:35:57.973341Z",uncompressed_size="74101916"} 1.757439364995146e+09
-walg_basebackup{backup_name="stream_20250909T173746Z",compressed_size="2542840",finish_time="2025-09-09T17:37:55.645579Z",start_time="2025-09-09T17:37:46.636711Z",uncompressed_size="74101915"} 1.757439475645579e+09
+walg_basebackup{backup_name="stream_20250912T155554Z",compressed_size="2543052",finish_time="2025-09-12T15:56:02.824003Z",start_time="2025-09-12T15:55:54.141199Z",uncompressed_size="74101944"} 1.757692562824003e+09
+walg_basebackup{backup_name="stream_20250912T155658Z",compressed_size="2543055",finish_time="2025-09-12T15:57:07.979960Z",start_time="2025-09-12T15:56:58.811089Z",uncompressed_size="74101945"} 1.75769262797996e+09
+walg_basebackup{backup_name="stream_20250912T160308Z",compressed_size="2542950",finish_time="2025-09-12T16:03:17.477113Z",start_time="2025-09-12T16:03:08.255359Z",uncompressed_size="74101945"} 1.757692997477113e+09
 # HELP walg_basebackup_count Number of basebackups
 # TYPE walg_basebackup_count gauge
-walg_basebackup_count 2.0
+walg_basebackup_count 3.0
 # HELP walg_basebackup_exception 1 if basebackup retrieval failed else 0
 # TYPE walg_basebackup_exception gauge
 walg_basebackup_exception 0.0
 # HELP walg_oldest_basebackup Oldest basebackup start time (unix seconds)
 # TYPE walg_oldest_basebackup gauge
-walg_oldest_basebackup 1.757439357973341e+09
+walg_oldest_basebackup 1.757692554141199e+09
 # HELP walg_last_backup_duration Duration seconds of last basebackup
 # TYPE walg_last_backup_duration gauge
-walg_last_backup_duration 9.008868
-# HELP walg_latest_active_binlog Current active binlog file
-# TYPE walg_latest_active_binlog gauge
-walg_latest_active_binlog{file="mysql-bin.000003"} 1.0
-walg_latest_active_binlog{file="mysql-bin.000004"} 1.0
-# HELP walg_latest_uploaded_binlog Latest uploaded binlog file (wal-g storage)
-# TYPE walg_latest_uploaded_binlog gauge
-walg_latest_uploaded_binlog{file="mysql-bin.000002"} 1.0
-walg_latest_uploaded_binlog{file="mysql-bin.000003"} 1.0
+walg_last_backup_duration 9.221754
+# HELP walg_binlog_latest_active Current active binlog file
+# TYPE walg_binlog_latest_active gauge
+walg_binlog_latest_active{file="mysql-bin.000005"} 1.0
+# HELP walg_binlog_latest_uploaded Latest uploaded binlog file (wal-g storage)
+# TYPE walg_binlog_latest_uploaded gauge
+walg_binlog_latest_uploaded{file="mysql-bin.000004"} 1.0
 ```
