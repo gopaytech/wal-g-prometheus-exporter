@@ -276,18 +276,26 @@ class MySQLExporter:
             if args.debug:
                 info(f"binlog-find stdout:\n{stdout}\n--- stderr ---\n{stderr}")
             combined = '\n'.join([stdout, stderr]).strip()
-            latest = None
+            binlogs = []
             for raw_line in combined.splitlines():
                 line = raw_line.strip()
                 if not line:
                     continue
-                # Try to extract filenames from any tokens in the line
                 for token in line.split():
                     if token.startswith('mysql-bin.') or token.startswith('binlog.'):
-                        latest = token
-            if latest:
-                self.latest_uploaded_binlog = latest
-                self.latest_uploaded_binlog_gauge.labels(file=latest).set(1)
+                        binlogs.append(token)
+            # Select the latest binlog by max sequence number
+            def binlog_seq(filename):
+                import re
+                m = re.search(r'(?:mysql-bin\.|binlog\.)(\d+)', filename)
+                return int(m.group(1)) if m else -1
+            latest_uploaded = max(binlogs, key=binlog_seq) if binlogs else None
+            # Remove all previous uploaded binlog gauge values
+            for label in list(self.latest_uploaded_binlog_gauge._metrics):
+                self.latest_uploaded_binlog_gauge.remove(label[0])
+            if latest_uploaded:
+                self.latest_uploaded_binlog = latest_uploaded
+                self.latest_uploaded_binlog_gauge.labels(file=latest_uploaded).set(1)
             else:
                 if args.debug:
                     info('binlog-find produced no identifiable binlog filename')
@@ -305,6 +313,9 @@ class MySQLExporter:
                 with conn.cursor(pymysql.cursors.DictCursor) as c:
                     c.execute('SHOW MASTER STATUS')
                     row = c.fetchone()
+                    # Remove all previous active binlog gauge values
+                    for label in list(self.latest_active_binlog_gauge._metrics):
+                        self.latest_active_binlog_gauge.remove(label[0])
                     if row and row.get('File'):
                         self.latest_active_binlog = row['File']
                         self.latest_active_binlog_gauge.labels(file=row['File']).set(1)
