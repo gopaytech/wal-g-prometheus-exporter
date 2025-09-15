@@ -265,6 +265,14 @@ class MySQLExporter:
     # ---- Binlogs ----
     def update_binlogs(self):
         # Latest uploaded via wal-g binlog-find (plain text, last match wins)
+        debug_tmp = os.getenv('EXPORTER_DEBUG_TMP_BINLOG') == '1'
+        def list_tmp_bin_stubs():
+            try:
+                return sorted([f for f in os.listdir('/tmp') if f.startswith('mysql-bin.')])
+            except Exception:
+                return []
+        if debug_tmp:
+            info(f"[debug-tmp] BEFORE binlog-find tmp stubs: {list_tmp_bin_stubs()}")
         try:
             cmd = [walg_binary_path, 'binlog-find']
             if args.config:
@@ -306,7 +314,11 @@ class MySQLExporter:
         except Exception as e:  # noqa: BLE001
             error(f"Unexpected binlog-find error: {e}")
 
+        if debug_tmp:
+            info(f"[debug-tmp] AFTER binlog-find tmp stubs: {list_tmp_bin_stubs()}")
         # Active binlog via SHOW MASTER STATUS
+        if debug_tmp:
+            info(f"[debug-tmp] BEFORE SHOW MASTER STATUS tmp stubs: {list_tmp_bin_stubs()}")
         try:
             conn = pymysql.connect(**self.conn_args)
             with conn:
@@ -321,6 +333,8 @@ class MySQLExporter:
                         self.latest_active_binlog_gauge.labels(file=row['File']).set(1)
         except Exception as e:  # noqa: BLE001
             error(f"SHOW MASTER STATUS failed: {e}")
+        if debug_tmp:
+            info(f"[debug-tmp] AFTER SHOW MASTER STATUS tmp stubs: {list_tmp_bin_stubs()}")
 
     # ---- Metric callbacks ----
     def _oldest_bb_callback(self):
