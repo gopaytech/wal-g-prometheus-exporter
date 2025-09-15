@@ -90,6 +90,15 @@ else:
 
 archive_dir = args.archive_dir
 tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
+cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'true')
+cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
+try:
+    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '512'))
+    if cleanup_max_size < 0:
+        raise ValueError
+except ValueError:
+    error("Invalid tmp_binlog_cleanup_max_size; using 512")
+    cleanup_max_size = 512
 if not os.path.isabs(tmp_binlog_dir):
     error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
     tmp_binlog_dir = '/tmp'
@@ -329,31 +338,52 @@ class MySQLExporter:
             #  - Skip if file size > 0 (acts only on empty marker files).
             #  - Best-effort; failures are logged at debug level only.
             try:
-                removed = 0
-                scanned = 0
-                import re as _re
-                pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
-                for name in os.listdir(tmp_binlog_dir):
-                    if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
-                        continue
-                    scanned += 1
-                    full = os.path.join(tmp_binlog_dir, name)
-                    try:
-                        st = os.stat(full)
-                    except FileNotFoundError:
-                        continue
-                    if st.st_size != 0:
-                        continue
-                    if not pat.match(name):
-                        continue
-                    try:
-                        os.remove(full)
-                        removed += 1
-                    except Exception:  # noqa: BLE001
-                        if args.debug:
-                            info(f"[debug-cleanup] failed to remove {full}")
-                if args.debug:
-                    info(f"[debug-cleanup] tmp binlog markers dir={tmp_binlog_dir} scanned={scanned} removed={removed}")
+                if cleanup_enabled:
+                    removed = 0
+                    scanned = 0
+                    skipped_pattern = 0
+                    skipped_size = 0
+                    skipped_error = 0
+                    import re as _re
+                    pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
+                    for name in os.listdir(tmp_binlog_dir):
+                        if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
+                            continue
+                        scanned += 1
+                        full = os.path.join(tmp_binlog_dir, name)
+                        try:
+                            st = os.stat(full)
+                        except FileNotFoundError:
+                            continue
+                        # Pattern check
+                        if not pat.match(name):
+                            skipped_pattern += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=pattern")
+                            continue
+                        # Size threshold check
+                        if st.st_size > cleanup_max_size:
+                            skipped_size += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=size bytes={st.st_size} max={cleanup_max_size}")
+                            continue
+                        try:
+                            os.remove(full)
+                            removed += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-remove] {full} bytes={st.st_size}")
+                        except Exception:  # noqa: BLE001
+                            skipped_error += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=error")
+                    if args.debug:
+                        info(
+                            f"[debug-cleanup] dir={tmp_binlog_dir} scanned={scanned} removed={removed} "
+                            f"skip_pattern={skipped_pattern} skip_size={skipped_size} skip_error={skipped_error} max_size={cleanup_max_size} enabled={cleanup_enabled}"
+                        )
+                else:
+                    if args.debug:
+                        info(f"[debug-cleanup] disabled dir={tmp_binlog_dir}")
             except Exception as ce:  # noqa: BLE001
                 if args.debug:
                     info(f"[debug-cleanup] cleanup error: {ce}")
