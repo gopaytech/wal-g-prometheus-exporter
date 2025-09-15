@@ -89,6 +89,29 @@ else:
         info(f"Config file not found or unreadable: {cfg_path}; continuing with env/defaults")
 
 archive_dir = args.archive_dir
+tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
+cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'true')
+cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
+try:
+    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '512'))
+    if cleanup_max_size < 0:
+        raise ValueError
+except ValueError:
+    error("Invalid tmp_binlog_cleanup_max_size; using 512")
+    cleanup_max_size = 512
+if not os.path.isabs(tmp_binlog_dir):
+    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
+if tmp_binlog_dir.rstrip('/') in ('', '/'):  # avoid root
+    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
+try:
+    if not os.path.isdir(tmp_binlog_dir):
+        info(f"tmp_binlog_dir {tmp_binlog_dir} does not exist; attempting to create")
+        os.makedirs(tmp_binlog_dir, exist_ok=True)
+except Exception as _e:  # noqa: BLE001
+    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp")
+    tmp_binlog_dir = '/tmp'
 
 # HTTP listen port precedence: exporter.port > ENV EXPORTER_PORT > default
 http_port = None
@@ -276,35 +299,101 @@ class MySQLExporter:
             if args.debug:
                 info(f"binlog-find stdout:\n{stdout}\n--- stderr ---\n{stderr}")
             combined = '\n'.join([stdout, stderr]).strip()
-            latest = None
+            binlogs = []
             for raw_line in combined.splitlines():
                 line = raw_line.strip()
                 if not line:
                     continue
-                # Try to extract filenames from any tokens in the line
                 for token in line.split():
                     if token.startswith('mysql-bin.') or token.startswith('binlog.'):
-                        latest = token
-            if latest:
-                self.latest_uploaded_binlog = latest
-                self.latest_uploaded_binlog_gauge.labels(file=latest).set(1)
+                        binlogs.append(token)
+            # Select the latest binlog by max sequence number
+            def binlog_seq(filename):
+                import re
+                m = re.search(r'(?:mysql-bin\.|binlog\.)(\d+)', filename)
+                return int(m.group(1)) if m else -1
+            latest_uploaded = max(binlogs, key=binlog_seq) if binlogs else None
+            # Remove all previous uploaded binlog gauge values
+            for label in list(self.latest_uploaded_binlog_gauge._metrics):
+                self.latest_uploaded_binlog_gauge.remove(label[0])
+            if latest_uploaded:
+                self.latest_uploaded_binlog = latest_uploaded
+                self.latest_uploaded_binlog_gauge.labels(file=latest_uploaded).set(1)
             else:
                 if args.debug:
                     info('binlog-find produced no identifiable binlog filename')
+
+            # Post binlog-find cleanup (Option B): remove tmp stub files created during binlog discovery.
+            # Safety rules:
+            #  - Only delete files in /tmp starting with mysql-bin. or binlog.
+            #  - Must match pattern (prefix + digits only) to avoid accidental deletion of unrelated files.
+            #  - Skip if file size > 0 (acts only on empty marker files).
+            #  - Best-effort; failures are logged at debug level only.
+            try:
+                if cleanup_enabled:
+                    removed = 0
+                    scanned = 0
+                    skipped_pattern = 0
+                    skipped_size = 0
+                    skipped_error = 0
+                    import re as _re
+                    pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
+                    for name in os.listdir(tmp_binlog_dir):
+                        if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
+                            continue
+                        scanned += 1
+                        full = os.path.join(tmp_binlog_dir, name)
+                        try:
+                            st = os.stat(full)
+                        except FileNotFoundError:
+                            continue
+                        # Pattern check
+                        if not pat.match(name):
+                            skipped_pattern += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=pattern")
+                            continue
+                        # Size threshold check
+                        if st.st_size > cleanup_max_size:
+                            skipped_size += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=size bytes={st.st_size} max={cleanup_max_size}")
+                            continue
+                        try:
+                            os.remove(full)
+                            removed += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-remove] {full} bytes={st.st_size}")
+                        except Exception:  # noqa: BLE001
+                            skipped_error += 1
+                            if args.debug:
+                                info(f"[debug-cleanup-skip] {full} reason=error")
+                    if args.debug:
+                        info(
+                            f"[debug-cleanup] dir={tmp_binlog_dir} scanned={scanned} removed={removed} "
+                            f"skip_pattern={skipped_pattern} skip_size={skipped_size} skip_error={skipped_error} max_size={cleanup_max_size} enabled={cleanup_enabled}"
+                        )
+                else:
+                    if args.debug:
+                        info(f"[debug-cleanup] disabled dir={tmp_binlog_dir}")
+            except Exception as ce:  # noqa: BLE001
+                if args.debug:
+                    info(f"[debug-cleanup] cleanup error: {ce}")
         except subprocess.CalledProcessError as e:  # noqa: PERF203
             error(f"binlog-find failed: {e}")
         except FileNotFoundError:
             error("wal-g binary not found for binlog-find")
         except Exception as e:  # noqa: BLE001
             error(f"Unexpected binlog-find error: {e}")
-
-        # Active binlog via SHOW MASTER STATUS
         try:
             conn = pymysql.connect(**self.conn_args)
             with conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as c:
                     c.execute('SHOW MASTER STATUS')
                     row = c.fetchone()
+                    # Remove all previous active binlog gauge values
+                    for label in list(self.latest_active_binlog_gauge._metrics):
+                        self.latest_active_binlog_gauge.remove(label[0])
                     if row and row.get('File'):
                         self.latest_active_binlog = row['File']
                         self.latest_active_binlog_gauge.labels(file=row['File']).set(1)
@@ -385,7 +474,6 @@ def main():
         except Exception as e:  # noqa: BLE001
             error(f"Loop error: {e}")
         time.sleep(scrape_interval)
-
 
 if __name__ == '__main__':
     main()
