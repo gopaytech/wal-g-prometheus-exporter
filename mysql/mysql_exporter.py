@@ -89,6 +89,20 @@ else:
         info(f"Config file not found or unreadable: {cfg_path}; continuing with env/defaults")
 
 archive_dir = args.archive_dir
+tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
+if not os.path.isabs(tmp_binlog_dir):
+    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
+if tmp_binlog_dir.rstrip('/') in ('', '/'):  # avoid root
+    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
+try:
+    if not os.path.isdir(tmp_binlog_dir):
+        info(f"tmp_binlog_dir {tmp_binlog_dir} does not exist; attempting to create")
+        os.makedirs(tmp_binlog_dir, exist_ok=True)
+except Exception as _e:  # noqa: BLE001
+    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp")
+    tmp_binlog_dir = '/tmp'
 
 # HTTP listen port precedence: exporter.port > ENV EXPORTER_PORT > default
 http_port = None
@@ -268,7 +282,7 @@ class MySQLExporter:
         debug_tmp = os.getenv('EXPORTER_DEBUG_TMP_BINLOG') == '1'
         def list_tmp_bin_stubs():
             try:
-                return sorted([f for f in os.listdir('/tmp') if f.startswith('mysql-bin.')])
+                return sorted([f for f in os.listdir(tmp_binlog_dir) if f.startswith('mysql-bin.') or f.startswith('binlog.')])
             except Exception:
                 return []
         if debug_tmp:
@@ -307,6 +321,42 @@ class MySQLExporter:
             else:
                 if args.debug:
                     info('binlog-find produced no identifiable binlog filename')
+
+            # Post binlog-find cleanup (Option B): remove tmp stub files created during binlog discovery.
+            # Safety rules:
+            #  - Only delete files in /tmp starting with mysql-bin. or binlog.
+            #  - Must match pattern (prefix + digits only) to avoid accidental deletion of unrelated files.
+            #  - Skip if file size > 0 (acts only on empty marker files).
+            #  - Best-effort; failures are logged at debug level only.
+            try:
+                removed = 0
+                scanned = 0
+                import re as _re
+                pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
+                for name in os.listdir(tmp_binlog_dir):
+                    if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
+                        continue
+                    scanned += 1
+                    full = os.path.join(tmp_binlog_dir, name)
+                    try:
+                        st = os.stat(full)
+                    except FileNotFoundError:
+                        continue
+                    if st.st_size != 0:
+                        continue
+                    if not pat.match(name):
+                        continue
+                    try:
+                        os.remove(full)
+                        removed += 1
+                    except Exception:  # noqa: BLE001
+                        if args.debug:
+                            info(f"[debug-cleanup] failed to remove {full}")
+                if args.debug:
+                    info(f"[debug-cleanup] tmp binlog markers dir={tmp_binlog_dir} scanned={scanned} removed={removed}")
+            except Exception as ce:  # noqa: BLE001
+                if args.debug:
+                    info(f"[debug-cleanup] cleanup error: {ce}")
         except subprocess.CalledProcessError as e:  # noqa: PERF203
             error(f"binlog-find failed: {e}")
         except FileNotFoundError:
