@@ -337,8 +337,12 @@ class Exporter():
         # Compute xlog_since_last_basebackup
         if self.bbs:
             archive_status = self.last_archive_status()
-            return wal_diff(archive_status['last_archived_wal'],
-                            self.bbs[len(self.bbs) - 1]['wal_file_name'])
+            # Check if last_archived_wal is not None before calling wal_diff
+            if archive_status['last_archived_wal'] is not None:
+                return wal_diff(archive_status['last_archived_wal'],
+                                self.bbs[len(self.bbs) - 1]['wal_file_name'])
+            else:
+                return 0
         else:
             return 0
 
