@@ -210,7 +210,11 @@ class Exporter():
             
             self.wal_archive_count.set(wal_archive_count)
             self.wal_archive_missing_count.set(wal_archive_missing_count)
-            self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
+            # Only set last_upload if last_archived_time is not None
+            if archive_status['last_archived_time'] is not None:
+                self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
+            else:
+                self.last_upload.labels('wal').set(0)
 
             logging.info('Finished updating WAL archive metrics...')
         else:
@@ -304,14 +308,16 @@ class Exporter():
                           'last_failed_time '
                           'FROM pg_stat_archiver')
                 res = c.fetchone()
-                if not bool(result):
+                if not bool(res):
                     raise Exception("Cannot fetch archive status")
                 return res
 
     def last_xlog_upload_callback(self):
         archive_status = self.last_archive_status()
         if archive_status['last_archived_time'] is None:
-            raise Exception("There is no WAL archiver process running on this postgresql\nCheck with SELECT * FROM pg_stat_archiver;")
+            # Return 0 instead of raising exception to allow Prometheus to scrape
+            warning("There is no WAL archiver process running on this postgresql. Check with SELECT * FROM pg_stat_archiver;")
+            return 0
         else:
             return archive_status['last_archived_time'].timestamp()
 
