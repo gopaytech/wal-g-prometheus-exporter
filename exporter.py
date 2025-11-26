@@ -249,9 +249,15 @@ class Exporter():
             # Remove metrics for deleted backups
             for bb in self.bbs:
                 if bb['backup_name'] not in new_bbs_name:
-                    # Backup deleted
+                    # Backup deleted - must pass all 8 label values to remove()
                     self.basebackup.remove(bb['wal_file_name'],
-                                           bb['start_lsn'])
+                                           bb['start_lsn'],
+                                           bb['finish_lsn'],
+                                           bb['is_permanent'],
+                                           convert_size(bb['uncompressed_size']),
+                                           convert_size(bb['compressed_size']),
+                                           bb['start_time'],
+                                           bb['finish_time'])
                     bb_deleted = bb_deleted + 1
             # Add metrics for new backups
             for bb in new_bbs:
