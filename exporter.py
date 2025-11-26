@@ -175,9 +175,15 @@ class Exporter():
             wal_archive_list = []
             wal_archive_integrity_status = []
         else:
-            wal_archive_list = list(json.loads(res.stdout)["integrity"]["details"])
-            wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
-            wal_archive_integrity_status = json.loads(res.stdout)["integrity"]["status"]
+            json_output = json.loads(res.stdout)
+            # Handle case where details might be None
+            details = json_output.get("integrity", {}).get("details")
+            if details is not None:
+                wal_archive_list = list(details)
+                wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
+            else:
+                wal_archive_list = []
+            wal_archive_integrity_status = json_output.get("integrity", {}).get("status", "UNKNOWN")
 
         wal_archive_count = 0
         wal_archive_missing_count = 0
