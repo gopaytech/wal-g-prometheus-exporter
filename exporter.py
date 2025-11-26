@@ -256,14 +256,15 @@ class Exporter():
             for bb in self.bbs:
                 if bb['backup_name'] not in new_bbs_name:
                     # Backup deleted - must pass all 8 label values to remove()
+                    # Convert datetime to string to match the label format
                     self.basebackup.remove(bb['wal_file_name'],
                                            bb['start_lsn'],
                                            bb['finish_lsn'],
                                            bb['is_permanent'],
                                            convert_size(bb['uncompressed_size']),
                                            convert_size(bb['compressed_size']),
-                                           bb['start_time'],
-                                           bb['finish_time'])
+                                           str(bb['start_time']),
+                                           str(bb['finish_time']))
                     bb_deleted = bb_deleted + 1
             # Add metrics for new backups
             for bb in new_bbs:
@@ -274,8 +275,8 @@ class Exporter():
                                             bb['is_permanent'],
                                             convert_size(bb['uncompressed_size']),
                                             convert_size(bb['compressed_size']),
-                                            bb['start_time'],
-                                            bb['finish_time'])
+                                            str(bb['start_time']),
+                                            str(bb['finish_time']))
                      .set(bb['start_time'].timestamp()))
 
             if len(new_bbs) == 0:
