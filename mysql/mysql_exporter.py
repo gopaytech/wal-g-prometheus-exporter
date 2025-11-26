@@ -255,10 +255,16 @@ class MySQLExporter:
         for old in self.bbs:
             if old.get('backup_name') not in new_names:
                 try:
+                    # Must use the same label format as when the metric was created
+                    st = old.get('start_time')
+                    ft = old.get('finish_time')
+                    st_label = st.isoformat().replace('+00:00', 'Z') if isinstance(st, datetime.datetime) else ''
+                    ft_label = ft.isoformat().replace('+00:00', 'Z') if isinstance(ft, datetime.datetime) else ''
                     self.basebackup.remove(old.get('backup_name'),
                                            str(old.get('uncompressed_size', 0)),
                                            str(old.get('compressed_size', 0)),
-                                           '', '')
+                                           st_label,
+                                           ft_label)
                 except Exception:  # noqa: BLE001
                     pass
 
