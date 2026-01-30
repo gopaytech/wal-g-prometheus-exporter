@@ -57,6 +57,10 @@ mysql-binlog-push:
 	# Push current binlogs to file backend
 	docker exec mysql-ubuntu-walg bash -lc 'wal-g binlog-push '
 
+mysql-archive-backup:
+	# Archive backups and keep 5 or less backups
+	docker exec mysql-ubuntu-walg bash -lc 'wal-g delete retain 5 --confirm'
+
 # Namespaced aliases
 mysql.up: mysql-up
 mysql.down: mysql-down

@@ -23,7 +23,7 @@ from pathlib import Path
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.3.1"
+parser.version = "0.3.2"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--config", help="walg config file path", action="store")
@@ -175,9 +175,15 @@ class Exporter():
             wal_archive_list = []
             wal_archive_integrity_status = []
         else:
-            wal_archive_list = list(json.loads(res.stdout)["integrity"]["details"])
-            wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
-            wal_archive_integrity_status = json.loads(res.stdout)["integrity"]["status"]
+            json_output = json.loads(res.stdout)
+            # Handle case where details might be None
+            details = json_output.get("integrity", {}).get("details")
+            if details is not None:
+                wal_archive_list = list(details)
+                wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
+            else:
+                wal_archive_list = []
+            wal_archive_integrity_status = json_output.get("integrity", {}).get("status", "UNKNOWN")
 
         wal_archive_count = 0
         wal_archive_missing_count = 0
@@ -210,7 +216,11 @@ class Exporter():
             
             self.wal_archive_count.set(wal_archive_count)
             self.wal_archive_missing_count.set(wal_archive_missing_count)
-            self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
+            # Only set last_upload if last_archived_time is not None
+            if archive_status['last_archived_time'] is not None:
+                self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
+            else:
+                self.last_upload.labels('wal').set(0)
 
             logging.info('Finished updating WAL archive metrics...')
         else:
@@ -245,9 +255,16 @@ class Exporter():
             # Remove metrics for deleted backups
             for bb in self.bbs:
                 if bb['backup_name'] not in new_bbs_name:
-                    # Backup deleted
+                    # Backup deleted - must pass all 8 label values to remove()
+                    # Convert datetime to string to match the label format
                     self.basebackup.remove(bb['wal_file_name'],
-                                           bb['start_lsn'])
+                                           bb['start_lsn'],
+                                           bb['finish_lsn'],
+                                           bb['is_permanent'],
+                                           convert_size(bb['uncompressed_size']),
+                                           convert_size(bb['compressed_size']),
+                                           str(bb['start_time']),
+                                           str(bb['finish_time']))
                     bb_deleted = bb_deleted + 1
             # Add metrics for new backups
             for bb in new_bbs:
@@ -258,8 +275,8 @@ class Exporter():
                                             bb['is_permanent'],
                                             convert_size(bb['uncompressed_size']),
                                             convert_size(bb['compressed_size']),
-                                            bb['start_time'],
-                                            bb['finish_time'])
+                                            str(bb['start_time']),
+                                            str(bb['finish_time']))
                      .set(bb['start_time'].timestamp()))
 
             if len(new_bbs) == 0:
@@ -304,14 +321,16 @@ class Exporter():
                           'last_failed_time '
                           'FROM pg_stat_archiver')
                 res = c.fetchone()
-                if not bool(result):
+                if not bool(res):
                     raise Exception("Cannot fetch archive status")
                 return res
 
     def last_xlog_upload_callback(self):
         archive_status = self.last_archive_status()
         if archive_status['last_archived_time'] is None:
-            raise Exception("There is no WAL archiver process running on this postgresql\nCheck with SELECT * FROM pg_stat_archiver;")
+            # Return 0 instead of raising exception to allow Prometheus to scrape
+            warning("There is no WAL archiver process running on this postgresql. Check with SELECT * FROM pg_stat_archiver;")
+            return 0
         else:
             return archive_status['last_archived_time'].timestamp()
 
@@ -331,8 +350,12 @@ class Exporter():
         # Compute xlog_since_last_basebackup
         if self.bbs:
             archive_status = self.last_archive_status()
-            return wal_diff(archive_status['last_archived_wal'],
-                            self.bbs[len(self.bbs) - 1]['wal_file_name'])
+            # Check if last_archived_wal is not None before calling wal_diff
+            if archive_status['last_archived_wal'] is not None:
+                return wal_diff(archive_status['last_archived_wal'],
+                                self.bbs[len(self.bbs) - 1]['wal_file_name'])
+            else:
+                return 0
         else:
             return 0
 
