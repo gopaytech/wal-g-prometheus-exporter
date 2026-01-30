@@ -18,11 +18,11 @@ config_exporter = {}
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.3.1"
+parser.version = "0.3.2"
 parser.add_argument("--archive_dir", required=True, help="MySQL binlog directory (usually datadir)")
 parser.add_argument("--config", help="wal-g config file path")
 parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-parser.add_argument("--version", action="store_true", help="Show binary version")
+parser.add_argument("--version", action="version", help="Show binary version")
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)

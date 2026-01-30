@@ -23,7 +23,7 @@ from pathlib import Path
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.3.1"
+parser.version = "0.3.2"
 parser.add_argument("--archive_dir",
                     help="pg_wal/archive_status/ Directory location", action="store", required=True)
 parser.add_argument("--config", help="walg config file path", action="store")
