@@ -18,7 +18,7 @@ config_exporter = {}
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.3.2"
+parser.version = "0.3.3"
 parser.add_argument("--archive_dir", required=True, help="MySQL binlog directory (usually datadir)")
 parser.add_argument("--config", help="wal-g config file path")
 parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -89,29 +89,29 @@ else:
         info(f"Config file not found or unreadable: {cfg_path}; continuing with env/defaults")
 
 archive_dir = args.archive_dir
-tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
+tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp/wal-g-exporter-binlogs')
 cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'true')
 cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
 try:
-    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '512'))
+    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '104857600'))
     if cleanup_max_size < 0:
         raise ValueError
 except ValueError:
-    error("Invalid tmp_binlog_cleanup_max_size; using 512")
-    cleanup_max_size = 512
+    error("Invalid tmp_binlog_cleanup_max_size; using 104857600")
+    cleanup_max_size = 104857600
 if not os.path.isabs(tmp_binlog_dir):
-    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
-    tmp_binlog_dir = '/tmp'
+    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp/wal-g-exporter-binlogs")
+    tmp_binlog_dir = '/tmp/wal-g-exporter-binlogs'
 if tmp_binlog_dir.rstrip('/') in ('', '/'):  # avoid root
-    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp")
-    tmp_binlog_dir = '/tmp'
+    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp/wal-g-exporter")
+    tmp_binlog_dir = '/tmp/wal-g-exporter'
 try:
     if not os.path.isdir(tmp_binlog_dir):
         info(f"tmp_binlog_dir {tmp_binlog_dir} does not exist; attempting to create")
         os.makedirs(tmp_binlog_dir, exist_ok=True)
 except Exception as _e:  # noqa: BLE001
-    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp")
-    tmp_binlog_dir = '/tmp'
+    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp/wal-g-exporter")
+    tmp_binlog_dir = '/tmp/wal-g-exporter'
 
 # HTTP listen port precedence: exporter.port > ENV EXPORTER_PORT > default
 http_port = None
@@ -298,7 +298,10 @@ class MySQLExporter:
             cmd = [walg_binary_path, 'binlog-find']
             if args.config:
                 cmd.extend(['--config', args.config])
-            res = subprocess.run(cmd, capture_output=True, check=True)
+            # Ensure wal-g writes temporary inspection binlogs into tmp_binlog_dir
+            env = os.environ.copy()
+            env['TMPDIR'] = tmp_binlog_dir
+            res = subprocess.run(cmd, env=env, capture_output=True, check=True)
             stdout = res.stdout.decode('utf-8', errors='replace')
             stderr = res.stderr.decode('utf-8', errors='replace')
             # wal-g often writes INFO/WARNING (and even the discovered binlog line) to stderr
@@ -328,22 +331,28 @@ class MySQLExporter:
             else:
                 if args.debug:
                     info('binlog-find produced no identifiable binlog filename')
-
-            # Post binlog-find cleanup (Option B): remove tmp stub files created during binlog discovery.
+        except subprocess.CalledProcessError as e:  # noqa: PERF203
+            error(f"binlog-find failed: {e}")
+        except FileNotFoundError:
+            error("wal-g binary not found for binlog-find")
+        except Exception as e:  # noqa: BLE001
+            error(f"Unexpected binlog-find error: {e}")
+        finally:
+            # Post binlog-find cleanup: remove tmp stub files created during binlog discovery.
             # Safety rules:
-            #  - Only delete files in /tmp starting with mysql-bin. or binlog.
-            #  - Must match pattern (prefix + digits only) to avoid accidental deletion of unrelated files.
-            #  - Skip if file size > 0 (acts only on empty marker files).
+            #  - Only delete files in tmp_binlog_dir starting with mysql-bin. or binlog.
+            #  - Must match pattern (prefix + digits/temp alphanumeric) to avoid accidental deletion.
+            #  - Skip if file size > cleanup_max_size (safeguard).
             #  - Best-effort; failures are logged at debug level only.
             try:
-                if cleanup_enabled:
+                if cleanup_enabled and os.path.isdir(tmp_binlog_dir):
                     removed = 0
                     scanned = 0
                     skipped_pattern = 0
                     skipped_size = 0
                     skipped_error = 0
                     import re as _re
-                    pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
+                    pat = _re.compile(r'^(mysql-bin|binlog)\.[0-9a-zA-Z_\-]+$')
                     for name in os.listdir(tmp_binlog_dir):
                         if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
                             continue
@@ -385,12 +394,6 @@ class MySQLExporter:
             except Exception as ce:  # noqa: BLE001
                 if args.debug:
                     info(f"[debug-cleanup] cleanup error: {ce}")
-        except subprocess.CalledProcessError as e:  # noqa: PERF203
-            error(f"binlog-find failed: {e}")
-        except FileNotFoundError:
-            error("wal-g binary not found for binlog-find")
-        except Exception as e:  # noqa: BLE001
-            error(f"Unexpected binlog-find error: {e}")
         try:
             conn = pymysql.connect(**self.conn_args)
             with conn:
