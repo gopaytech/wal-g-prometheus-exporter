@@ -89,29 +89,29 @@ else:
         info(f"Config file not found or unreadable: {cfg_path}; continuing with env/defaults")
 
 archive_dir = args.archive_dir
-tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp/wal-g-exporter-binlogs')
+tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
 cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'false')
 cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
 try:
-    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '104857600'))
+    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '500000'))
     if cleanup_max_size < 0:
         raise ValueError
 except ValueError:
-    error("Invalid tmp_binlog_cleanup_max_size; using 104857600")
-    cleanup_max_size = 104857600
+    error("Invalid tmp_binlog_cleanup_max_size; using 500000")
+    cleanup_max_size = 500000
 if not os.path.isabs(tmp_binlog_dir):
-    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp/wal-g-exporter-binlogs")
-    tmp_binlog_dir = '/tmp/wal-g-exporter-binlogs'
+    error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
 if tmp_binlog_dir.rstrip('/') in ('', '/'):  # avoid root
-    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp/wal-g-exporter")
-    tmp_binlog_dir = '/tmp/wal-g-exporter'
+    error("Refusing to use root directory for tmp_binlog_dir; falling back to /tmp")
+    tmp_binlog_dir = '/tmp'
 try:
     if not os.path.isdir(tmp_binlog_dir):
         info(f"tmp_binlog_dir {tmp_binlog_dir} does not exist; attempting to create")
         os.makedirs(tmp_binlog_dir, exist_ok=True)
 except Exception as _e:  # noqa: BLE001
-    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp/wal-g-exporter")
-    tmp_binlog_dir = '/tmp/wal-g-exporter'
+    error(f"Cannot ensure tmp_binlog_dir {tmp_binlog_dir}: {_e}; using /tmp")
+    tmp_binlog_dir = '/tmp'
 
 # HTTP listen port precedence: exporter.port > ENV EXPORTER_PORT > default
 http_port = None
