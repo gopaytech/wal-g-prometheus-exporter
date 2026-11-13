@@ -90,15 +90,15 @@ else:
 
 archive_dir = args.archive_dir
 tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp')
-cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'false')
+cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'true')
 cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
 try:
-    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '500000'))
+    cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '512'))
     if cleanup_max_size < 0:
         raise ValueError
 except ValueError:
-    error("Invalid tmp_binlog_cleanup_max_size; using 500000")
-    cleanup_max_size = 500000
+    error("Invalid tmp_binlog_cleanup_max_size; using 512")
+    cleanup_max_size = 512
 if not os.path.isabs(tmp_binlog_dir):
     error(f"tmp_binlog_dir must be absolute, got: {tmp_binlog_dir}; falling back to /tmp")
     tmp_binlog_dir = '/tmp'
@@ -298,10 +298,7 @@ class MySQLExporter:
             cmd = [walg_binary_path, 'binlog-find']
             if args.config:
                 cmd.extend(['--config', args.config])
-            # Ensure wal-g writes temporary inspection binlogs into tmp_binlog_dir
-            env = os.environ.copy()
-            env['TMPDIR'] = tmp_binlog_dir
-            res = subprocess.run(cmd, env=env, capture_output=True, check=True)
+            res = subprocess.run(cmd, capture_output=True, check=True)
             stdout = res.stdout.decode('utf-8', errors='replace')
             stderr = res.stderr.decode('utf-8', errors='replace')
             # wal-g often writes INFO/WARNING (and even the discovered binlog line) to stderr
@@ -331,28 +328,22 @@ class MySQLExporter:
             else:
                 if args.debug:
                     info('binlog-find produced no identifiable binlog filename')
-        except subprocess.CalledProcessError as e:  # noqa: PERF203
-            error(f"binlog-find failed: {e}")
-        except FileNotFoundError:
-            error("wal-g binary not found for binlog-find")
-        except Exception as e:  # noqa: BLE001
-            error(f"Unexpected binlog-find error: {e}")
-        finally:
-            # Post binlog-find cleanup: remove tmp stub files created during binlog discovery.
+
+            # Post binlog-find cleanup (Option B): remove tmp stub files created during binlog discovery.
             # Safety rules:
-            #  - Only delete files in tmp_binlog_dir starting with mysql-bin. or binlog.
-            #  - Must match pattern (prefix + digits/temp alphanumeric) to avoid accidental deletion.
-            #  - Skip if file size > cleanup_max_size (safeguard).
+            #  - Only delete files in /tmp starting with mysql-bin. or binlog.
+            #  - Must match pattern (prefix + digits only) to avoid accidental deletion of unrelated files.
+            #  - Skip if file size > 0 (acts only on empty marker files).
             #  - Best-effort; failures are logged at debug level only.
             try:
-                if cleanup_enabled and os.path.isdir(tmp_binlog_dir):
+                if cleanup_enabled:
                     removed = 0
                     scanned = 0
                     skipped_pattern = 0
                     skipped_size = 0
                     skipped_error = 0
                     import re as _re
-                    pat = _re.compile(r'^(mysql-bin|binlog)\.[0-9a-zA-Z_\-]+$')
+                    pat = _re.compile(r'^(mysql-bin|binlog)\.\d+$')
                     for name in os.listdir(tmp_binlog_dir):
                         if not (name.startswith('mysql-bin.') or name.startswith('binlog.')):
                             continue
@@ -394,6 +385,12 @@ class MySQLExporter:
             except Exception as ce:  # noqa: BLE001
                 if args.debug:
                     info(f"[debug-cleanup] cleanup error: {ce}")
+        except subprocess.CalledProcessError as e:  # noqa: PERF203
+            error(f"binlog-find failed: {e}")
+        except FileNotFoundError:
+            error("wal-g binary not found for binlog-find")
+        except Exception as e:  # noqa: BLE001
+            error(f"Unexpected binlog-find error: {e}")
         try:
             conn = pymysql.connect(**self.conn_args)
             with conn:
