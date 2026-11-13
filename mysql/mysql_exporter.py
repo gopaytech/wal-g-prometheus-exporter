@@ -449,8 +449,11 @@ def main():
     dbpassword = config_db.get('password') or os.getenv('MYSQL_PASSWORD', '')
     dbname = config_db.get('database') or os.getenv('MYSQL_DATABASE', 'mysql')
     ssl_disabled = str(config_db.get('ssl_disabled', 'false')).lower() in ('1', 'true', 'yes', 'on')
+    dbsocket = config_db.get('socket') or os.getenv('MYSQL_SOCKET')
 
     conn_args = dict(host=dbhost, port=dbport, user=dbuser, password=dbpassword, database=dbname, charset='utf8mb4', connect_timeout=10)
+    if dbsocket:
+        conn_args['unix_socket'] = dbsocket
     if ssl_disabled:
         conn_args['ssl'] = None
 
@@ -463,9 +466,12 @@ def main():
 
     # Warm-up DB connectivity
     while True:
+        if terminate:
+            break
         try:
             conn = pymysql.connect(**conn_args)
-            info(f"Connected to MySQL at {dbhost}:{dbport}")
+            endpoint = dbsocket if dbsocket else f"{dbhost}:{dbport}"
+            info(f"Connected to MySQL at {endpoint}")
             with conn:
                 with conn.cursor() as c:
                     c.execute('SELECT 1')
