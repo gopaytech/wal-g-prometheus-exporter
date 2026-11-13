@@ -90,7 +90,7 @@ else:
 
 archive_dir = args.archive_dir
 tmp_binlog_dir = config_db.get('tmp_binlog_dir') or os.getenv('WALG_EXPORTER_TMP_BINLOG_DIR', '/tmp/wal-g-exporter-binlogs')
-cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'true')
+cleanup_enabled_raw = config_db.get('tmp_binlog_cleanup_enabled', 'false')
 cleanup_enabled = str(cleanup_enabled_raw).lower() in ('1','true','yes','on')
 try:
     cleanup_max_size = int(config_db.get('tmp_binlog_cleanup_max_size', '104857600'))
