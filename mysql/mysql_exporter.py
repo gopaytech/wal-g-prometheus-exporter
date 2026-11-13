@@ -398,7 +398,10 @@ class MySQLExporter:
             conn = pymysql.connect(**self.conn_args)
             with conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as c:
-                    c.execute('SHOW MASTER STATUS')
+                    try:
+                        c.execute('SHOW BINARY LOG STATUS')
+                    except Exception:
+                        c.execute('SHOW MASTER STATUS')
                     row = c.fetchone()
                     # Remove all previous active binlog gauge values
                     for label in list(self.latest_active_binlog_gauge._metrics):
@@ -407,7 +410,7 @@ class MySQLExporter:
                         self.latest_active_binlog = row['File']
                         self.latest_active_binlog_gauge.labels(file=row['File']).set(1)
         except Exception as e:  # noqa: BLE001
-            error(f"SHOW MASTER STATUS failed: {e}")
+            error(f"Binary log status query failed: {e}")
 
     # ---- Metric callbacks ----
     def _oldest_bb_callback(self):
