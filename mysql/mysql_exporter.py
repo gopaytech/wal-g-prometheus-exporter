@@ -18,7 +18,7 @@ config_exporter = {}
 walg_binary_path = os.getenv("WALG_BINARY_PATH", "/usr/local/bin/wal-g")
 
 parser = argparse.ArgumentParser()
-parser.version = "0.3.2"
+parser.version = "0.3.3"
 parser.add_argument("--archive_dir", required=True, help="MySQL binlog directory (usually datadir)")
 parser.add_argument("--config", help="wal-g config file path")
 parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -395,7 +395,10 @@ class MySQLExporter:
             conn = pymysql.connect(**self.conn_args)
             with conn:
                 with conn.cursor(pymysql.cursors.DictCursor) as c:
-                    c.execute('SHOW MASTER STATUS')
+                    try:
+                        c.execute('SHOW BINARY LOG STATUS')
+                    except Exception:
+                        c.execute('SHOW MASTER STATUS')
                     row = c.fetchone()
                     # Remove all previous active binlog gauge values
                     for label in list(self.latest_active_binlog_gauge._metrics):
@@ -404,7 +407,7 @@ class MySQLExporter:
                         self.latest_active_binlog = row['File']
                         self.latest_active_binlog_gauge.labels(file=row['File']).set(1)
         except Exception as e:  # noqa: BLE001
-            error(f"SHOW MASTER STATUS failed: {e}")
+            error(f"Binary log status query failed: {e}")
 
     # ---- Metric callbacks ----
     def _oldest_bb_callback(self):
@@ -443,8 +446,11 @@ def main():
     dbpassword = config_db.get('password') or os.getenv('MYSQL_PASSWORD', '')
     dbname = config_db.get('database') or os.getenv('MYSQL_DATABASE', 'mysql')
     ssl_disabled = str(config_db.get('ssl_disabled', 'false')).lower() in ('1', 'true', 'yes', 'on')
+    dbsocket = config_db.get('socket') or os.getenv('MYSQL_SOCKET')
 
     conn_args = dict(host=dbhost, port=dbport, user=dbuser, password=dbpassword, database=dbname, charset='utf8mb4', connect_timeout=10)
+    if dbsocket:
+        conn_args['unix_socket'] = dbsocket
     if ssl_disabled:
         conn_args['ssl'] = None
 
@@ -457,9 +463,12 @@ def main():
 
     # Warm-up DB connectivity
     while True:
+        if terminate:
+            break
         try:
             conn = pymysql.connect(**conn_args)
-            info(f"Connected to MySQL at {dbhost}:{dbport}")
+            endpoint = dbsocket if dbsocket else f"{dbhost}:{dbport}"
+            info(f"Connected to MySQL at {endpoint}")
             with conn:
                 with conn.cursor() as c:
                     c.execute('SELECT 1')
