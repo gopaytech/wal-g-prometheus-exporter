@@ -242,7 +242,7 @@ class Exporter():
                                  capture_output=True, check=True)
 
             # Check if backup-list return an empty result
-            if res.stdout.decode("utf-8") is "":
+            if res.stdout.decode("utf-8") == "":
                 new_bbs = []
             else:
                 new_bbs = list(map(format_date, json.loads(res.stdout)))
