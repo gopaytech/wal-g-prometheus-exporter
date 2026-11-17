@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.3.3)'
+        required: true
+        default: 'v0.3.3'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+
+      - name: Build Postgres Exporter Binary
+        run: |
+          pip install -r requirements.txt
+          pyinstaller --onefile exporter.py
+          mv dist/exporter wal-g-exporter
+          tar -zcvf wal-g-exporter-postgres.linux-amd64.tar.gz wal-g-exporter
+          rm -rf wal-g-exporter dist/ build/
+
+      - name: Build MySQL Exporter Binary
+        run: |
+          pip install -r mysql/requirements.txt
+          pyinstaller --onefile \
+            --hidden-import=prometheus_client \
+            --hidden-import=dotenv \
+            --hidden-import=pymysql \
+            --hidden-import=cryptography \
+            mysql/mysql_exporter.py
+          mv dist/mysql_exporter wal-g-exporter
+          tar -zcvf wal-g-exporter-mysql.linux-amd64.tar.gz wal-g-exporter
+          rm -rf wal-g-exporter dist/ build/
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.tag }}
+          name: Release ${{ github.ref_name || inputs.tag }}
+          files: |
+            wal-g-exporter-postgres.linux-amd64.tar.gz
+            wal-g-exporter-mysql.linux-amd64.tar.gz
+          generate_release_notes: true
